@@ -1,4 +1,4 @@
-# webview-boost-app
+# neo-processing
 
 Desktop app with `webview`, local HTTP server, and embedded static assets.
 
