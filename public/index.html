@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>neo-processing</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="side-panel" id="side-panel" aria-hidden="true">
+      <div class="side-panel-inner">
+        <h2>Panel</h2>
+        <p>Sidebar content.</p>
+      </div>
+    </aside>
+
+    <div class="main-layout">
+      <header class="top-row">
+        <nav class="menu-bar" aria-label="Application menu">
+          <div class="menu-group">
+            <button class="menu-button" type="button" aria-haspopup="true" aria-expanded="false" data-menu="file-menu">File</button>
+            <ul class="menu-list" id="file-menu" role="menu" hidden>
+              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="New file">New</button></li>
+              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Open file">Open</button></li>
+              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Save file">Save</button></li>
+            </ul>
+          </div>
+          <div class="menu-group">
+            <button class="menu-button" type="button" aria-haspopup="true" aria-expanded="false" data-menu="edit-menu">Edit</button>
+            <ul class="menu-list" id="edit-menu" role="menu" hidden>
+              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Undo edit">Undo</button></li>
+              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Redo edit">Redo</button></li>
+              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Paste content">Paste</button></li>
+            </ul>
+          </div>
+        </nav>
+        <button id="hamburger-button" class="hamburger-button" type="button" aria-controls="side-panel" aria-expanded="false" aria-label="Toggle sidebar">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </header>
+
+      <main class="middle-row"></main>
+
+      <footer class="bottom-row">
+        <span class="status-label">Status</span>
+        <output id="hello-output" aria-live="polite">Ready.</output>
+      </footer>
+    </div>
+  </div>
+
+  <script src="/script.js"></script>
+</body>
+</html>
