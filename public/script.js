@@ -6,6 +6,19 @@ const hamburgerButton = document.getElementById("hamburger-button");
 const appShell = document.querySelector(".app-shell");
 const sidePanel = document.getElementById("side-panel");
 const statusContainer = document.querySelector(".bottom-row");
+const middleRow = document.getElementById("middle-row");
+const splitter = document.getElementById("splitter");
+
+let isResizingPanels = false;
+
+function setLeftPanelSize(percent) {
+  if (!middleRow) {
+    return;
+  }
+
+  const clamped = Math.min(80, Math.max(20, percent));
+  middleRow.style.setProperty("--left-panel-size", `${clamped}%`);
+}
 
 function scrollStatusToBottom() {
   if (!statusContainer) {
@@ -50,6 +63,20 @@ function toggleSidebar() {
   hamburgerButton.setAttribute("aria-expanded", String(isOpen));
   sidePanel.setAttribute("aria-hidden", String(!isOpen));
   appendStatus(isOpen ? "Sidebar opened" : "Sidebar closed");
+}
+
+function updateSplitFromPointer(clientX) {
+  if (!middleRow) {
+    return;
+  }
+
+  const rect = middleRow.getBoundingClientRect();
+  if (rect.width <= 0) {
+    return;
+  }
+
+  const percent = ((clientX - rect.left) / rect.width) * 100;
+  setLeftPanelSize(percent);
 }
 
 
@@ -97,3 +124,36 @@ document.addEventListener("keydown", (event) => {
 if (hamburgerButton) {
   hamburgerButton.addEventListener("click", toggleSidebar);
 }
+
+if (splitter && middleRow) {
+  splitter.addEventListener("pointerdown", (event) => {
+    isResizingPanels = true;
+    splitter.setPointerCapture(event.pointerId);
+    updateSplitFromPointer(event.clientX);
+    event.preventDefault();
+  });
+
+  splitter.addEventListener("pointermove", (event) => {
+    if (!isResizingPanels) {
+      return;
+    }
+
+    updateSplitFromPointer(event.clientX);
+  });
+
+  splitter.addEventListener("pointerup", (event) => {
+    isResizingPanels = false;
+    if (splitter.hasPointerCapture(event.pointerId)) {
+      splitter.releasePointerCapture(event.pointerId);
+    }
+  });
+
+  splitter.addEventListener("pointercancel", (event) => {
+    isResizingPanels = false;
+    if (splitter.hasPointerCapture(event.pointerId)) {
+      splitter.releasePointerCapture(event.pointerId);
+    }
+  });
+}
+
+setLeftPanelSize(50);

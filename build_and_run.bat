@@ -13,12 +13,14 @@ cmake --build build --target neo-processing -j --config Debug
 if errorlevel 1 goto :error
 
 echo [3/3] Running neo-processing
-if not exist ".\build\Debug\neo-processing.exe" (
-	echo ERROR: .\build\Debug\neo-processing.exe not found.
+if exist ".\build\neo-processing.exe" (
+	".\build\neo-processing.exe"
+) else if exist ".\build\Debug\neo-processing.exe" (
+	".\build\Debug\neo-processing.exe"
+) else (
+	echo ERROR: neo-processing executable not found in .\build or .\build\Debug.
 	goto :error
 )
-
-".\build\Debug\neo-processing.exe"
 if errorlevel 1 goto :error
 
 echo.
