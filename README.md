@@ -31,7 +31,7 @@ cmake --build build --target neo-processing -j --config Release
 ```
 
 
-## Dependencies
+## Development
 
 Build/runtime prerequisites:
 

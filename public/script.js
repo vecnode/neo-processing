@@ -1,10 +1,34 @@
-const helloButton = document.getElementById("hello-button");
-const helloOutput = document.getElementById("hello-output");
+
+const terminalOutput = document.getElementById("terminal");
 const menuButtons = document.querySelectorAll(".menu-button");
 const menuItems = document.querySelectorAll(".menu-item");
 const hamburgerButton = document.getElementById("hamburger-button");
 const appShell = document.querySelector(".app-shell");
 const sidePanel = document.getElementById("side-panel");
+const statusContainer = document.querySelector(".bottom-row");
+
+function scrollStatusToBottom() {
+  if (!statusContainer) {
+    return;
+  }
+
+  statusContainer.scrollTop = statusContainer.scrollHeight;
+}
+
+function appendStatus(message) {
+  if (!terminalOutput) {
+    return;
+  }
+
+  if (!terminalOutput.textContent) {
+    terminalOutput.textContent = message;
+    scrollStatusToBottom();
+    return;
+  }
+
+  terminalOutput.textContent += `\n${message}`;
+  scrollStatusToBottom();
+}
 
 function closeMenus() {
   menuButtons.forEach((button) => {
@@ -25,30 +49,11 @@ function toggleSidebar() {
   const isOpen = appShell.classList.toggle("sidebar-open");
   hamburgerButton.setAttribute("aria-expanded", String(isOpen));
   sidePanel.setAttribute("aria-hidden", String(!isOpen));
+  appendStatus(isOpen ? "Sidebar opened" : "Sidebar closed");
 }
 
-async function printHelloWorld() {
-  if (!helloButton || !helloOutput) {
-    return;
-  }
 
-  helloButton.disabled = true;
-  helloOutput.textContent = "Loading...";
 
-  try {
-    const response = await fetch("/api/hello");
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    const text = await response.text();
-    helloOutput.textContent = text;
-  } catch (error) {
-    helloOutput.textContent = `Request failed: ${error.message}`;
-  } finally {
-    helloButton.disabled = false;
-  }
-}
 
 menuButtons.forEach((button) => {
   button.addEventListener("click", (event) => {
@@ -69,9 +74,7 @@ menuButtons.forEach((button) => {
 
 menuItems.forEach((item) => {
   item.addEventListener("click", () => {
-    if (helloOutput) {
-      helloOutput.textContent = `${item.dataset.action} clicked`;
-    }
+    appendStatus(`${item.dataset.action} clicked`);
     closeMenus();
   });
 });
@@ -88,9 +91,8 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-if (helloButton) {
-  helloButton.addEventListener("click", printHelloWorld);
-}
+
+
 
 if (hamburgerButton) {
   hamburgerButton.addEventListener("click", toggleSidebar);
