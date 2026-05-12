@@ -1,5 +1,4 @@
-// vecnode 2026-05-12
-
+// vecnode 2026
 const terminalOutput = document.getElementById("terminal");
 const menuButtons = document.querySelectorAll(".menu-button");
 const menuItems = document.querySelectorAll(".menu-item");
@@ -9,11 +8,108 @@ const sidePanel = document.getElementById("side-panel");
 const statusContainer = document.querySelector(".bottom-row");
 const middleRow = document.getElementById("middle-row");
 const splitter = document.getElementById("splitter");
-const aceEditorContainer = document.getElementById("ace-editor");
-const runButton = document.getElementById("run-button");
+const aceContainer = document.getElementById("ace-editor");
+
+const defaultSketch = `// Start your sketch
+function setup() {
+  
+}
+
+function draw() {
+  
+}`;
 
 let isResizingPanels = false;
 let aceEditor = null;
+let openFileInput = null;
+
+function initializeEditor() {
+  if (!aceContainer || typeof ace === "undefined") {
+    return;
+  }
+
+  aceEditor = ace.edit("ace-editor");
+  aceEditor.setTheme("ace/theme/textmate");
+  aceEditor.session.setMode("ace/mode/javascript");
+  aceEditor.session.setTabSize(2);
+  aceEditor.session.setUseSoftTabs(true);
+  aceEditor.setOptions({
+    fontSize: "14px",
+    showPrintMargin: false,
+    wrap: true,
+  });
+  aceEditor.setValue(defaultSketch, -1);
+  aceEditor.resize();
+}
+
+function getEditorContents() {
+  if (!aceEditor) {
+    return defaultSketch;
+  }
+
+  return aceEditor.getValue();
+}
+
+function setEditorContents(contents) {
+  if (!aceEditor) {
+    return;
+  }
+
+  aceEditor.setValue(contents, -1);
+  aceEditor.clearSelection();
+  aceEditor.resize();
+}
+
+function ensureOpenFileInput() {
+  if (openFileInput) {
+    return openFileInput;
+  }
+
+  openFileInput = document.createElement("input");
+  openFileInput.type = "file";
+  openFileInput.accept = ".js,text/javascript,application/javascript,text/plain";
+  openFileInput.style.display = "none";
+  openFileInput.addEventListener("change", async () => {
+    const file = openFileInput.files && openFileInput.files[0];
+    if (!file) {
+      return;
+    }
+
+    const contents = await file.text();
+    setEditorContents(contents);
+    appendStatus(`Opened ${file.name}`);
+    openFileInput.value = "";
+  });
+  document.body.appendChild(openFileInput);
+
+  return openFileInput;
+}
+
+function newSketch() {
+  setEditorContents(defaultSketch);
+  appendStatus("New sketch created");
+}
+
+function openSketch() {
+  ensureOpenFileInput().click();
+}
+
+async function saveSketch() {
+  const response = await fetch("/api/save-script", {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+    },
+    body: getEditorContents(),
+  });
+
+  const result = await response.text();
+  if (!response.ok) {
+    throw new Error(result || "Save failed");
+  }
+
+  appendStatus(`Saved to outputs/${result}`);
+}
 
 function setLeftPanelSize(percent) {
   if (!middleRow) {
@@ -83,82 +179,6 @@ function updateSplitFromPointer(clientX) {
   setLeftPanelSize(percent);
 }
 
-function resetEditorToDefault() {
-  if (!aceEditor) {
-    return;
-  }
-
-  aceEditor.session.setValue(defaultCode);
-  aceEditor.clearSelection();
-  aceEditor.focus();
-  appendStatus("New file created");
-}
-
-function openLocalFilePicker() {
-  const fileInput = document.createElement("input");
-  fileInput.type = "file";
-  fileInput.accept = ".js,.txt,.json,.html,.css,.md,.xml,.ts,.tsx,.jsx,*/*";
-  fileInput.style.display = "none";
-
-  fileInput.addEventListener("change", () => {
-    const file = fileInput.files && fileInput.files[0];
-    if (!file || !aceEditor) {
-      fileInput.remove();
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const contents = typeof reader.result === "string" ? reader.result : "";
-      aceEditor.session.setValue(contents);
-      aceEditor.clearSelection();
-      aceEditor.focus();
-      appendStatus(`Opened ${file.name}`);
-      fileInput.remove();
-    };
-    reader.onerror = () => {
-      appendStatus(`Failed to open ${file.name}`);
-      fileInput.remove();
-    };
-    reader.readAsText(file);
-  }, { once: true });
-
-  document.body.appendChild(fileInput);
-  fileInput.click();
-}
-
-async function saveEditorToOutputs() {
-  if (!aceEditor) {
-    return;
-  }
-
-  const contents = aceEditor.getValue();
-  if (!contents.trim()) {
-    appendStatus("Nothing to save");
-    return;
-  }
-
-  try {
-    const response = await fetch("/api/save-script", {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-      },
-      body: contents,
-    });
-
-    const result = await response.text();
-    if (!response.ok) {
-      appendStatus(`Save failed: ${result}`);
-      return;
-    }
-
-    appendStatus(`Saved outputs/${result}`);
-  } catch (error) {
-    appendStatus(`Save failed: ${error instanceof Error ? error.message : "Unknown error"}`);
-  }
-}
-
 
 
 
@@ -181,14 +201,17 @@ menuButtons.forEach((button) => {
 
 menuItems.forEach((item) => {
   item.addEventListener("click", () => {
-    if (item.dataset.action === "New file") {
-      resetEditorToDefault();
-    } else if (item.dataset.action === "Open file") {
-      openLocalFilePicker();
-    } else if (item.dataset.action === "Save file") {
-      saveEditorToOutputs();
+    const action = item.dataset.action;
+    if (action === "New file") {
+      newSketch();
+    } else if (action === "Open file") {
+      openSketch();
+    } else if (action === "Save file") {
+      saveSketch().catch((error) => {
+        appendStatus(error.message);
+      });
     } else {
-      appendStatus(`${item.dataset.action} clicked`);
+      appendStatus(`${action} clicked`);
     }
     closeMenus();
   });
@@ -206,18 +229,17 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+window.addEventListener("resize", () => {
+  if (aceEditor) {
+    aceEditor.resize();
+  }
+});
+
 
 
 
 if (hamburgerButton) {
   hamburgerButton.addEventListener("click", toggleSidebar);
-}
-
-if (runButton) {
-  runButton.addEventListener("click", () => {
-    closeMenus();
-    appendStatus("hello-world");
-  });
 }
 
 if (splitter && middleRow) {
@@ -252,36 +274,4 @@ if (splitter && middleRow) {
 }
 
 setLeftPanelSize(50);
-
-// Default p5js code
-
-const defaultCode = `function setup() {
-
-}
-
-function draw() {
-}`;
-
-if (window.ace && aceEditorContainer) {
-  aceEditor = ace.edit(aceEditorContainer);
-
-  aceEditor.setTheme("ace/theme/textmate");
-  aceEditor.session.setMode("ace/mode/javascript");
-  aceEditor.session.setUseWorker(false);
-  aceEditor.setOptions({
-    showGutter: true,
-    showFoldWidgets: true,
-    showPrintMargin: false,
-    highlightActiveLine: true,
-    fontSize: "13px",
-    useSoftTabs: true,
-    tabSize: 2,
-  });
-  aceEditor.session.setValue(defaultCode);
-  aceEditor.clearSelection();
-  aceEditor.resize();
-
-  window.addEventListener("resize", () => {
-    aceEditor.resize();
-  });
-}
+initializeEditor();
