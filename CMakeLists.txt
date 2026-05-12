@@ -2,6 +2,41 @@ cmake_minimum_required(VERSION 3.20)
 project(webview-boost-app CXX)
 set(CMAKE_CXX_STANDARD 20)
 
+# ---------------------------------------------------------------------------
+# Windows + MSVC: detect MinGW/MSYS2 header contamination early.
+# If msys64 or mingw paths leak into the compiler's include search order,
+# MSVC will pull MinGW-specific headers (corecrt.h, winnt.h) and fail.
+# ---------------------------------------------------------------------------
+if(WIN32 AND MSVC)
+    set(_mingw_patterns "msys64" "msys2" "mingw64" "mingw32")
+    set(_env_vars "INCLUDE" "CPATH" "C_INCLUDE_PATH" "CPLUS_INCLUDE_PATH")
+    foreach(_var ${_env_vars})
+        if(DEFINED ENV{${_var}})
+            foreach(_pat ${_mingw_patterns})
+                string(TOLOWER "$ENV{${_var}}" _val_lower)
+                if(_val_lower MATCHES "${_pat}")
+                    message(WARNING
+                        "[neo-processing] Possible MinGW/MSYS2 header conflict detected!\n"
+                        "  Environment variable ${_var} contains '${_pat}' paths.\n"
+                        "  MSVC may pick up MinGW headers instead of Windows SDK headers.\n"
+                        "  Fix: launch cmake from a plain Developer Command Prompt for VS,\n"
+                        "  or temporarily remove MinGW/MSYS2 entries from ${_var}.")
+                endif()
+            endforeach()
+        endif()
+    endforeach()
+    # Also check PATH for mingw bin dirs leaking include side-effects
+    string(TOLOWER "$ENV{PATH}" _path_lower)
+    foreach(_pat ${_mingw_patterns})
+        if(_path_lower MATCHES "${_pat}")
+            message(STATUS
+                "[neo-processing] Note: PATH contains '${_pat}'. "
+                "If you see corecrt.h / winnt.h errors, remove MinGW/MSYS2 from PATH "
+                "and re-run cmake from a VS Developer Command Prompt.")
+        endif()
+    endforeach()
+endif()
+
 include(FetchContent)
 if(POLICY CMP0135)
     cmake_policy(SET CMP0135 NEW)

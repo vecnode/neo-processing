@@ -8,7 +8,8 @@ Desktop app with `webview`, local HTTP server, and embedded static assets.
 
 When ready, this application will allow to program JavaScript with `p5.js` libraries and use full-screen rendering for real-world deployment. There are also plans to generate independent applications without the editor and interface for each sketch. In the near future it will allow to add arbitrary JavaScript libraries.
 
-![image](./assets/img1.png)
+![image](./assets/img2.png)
+
 
 ## Reproduce
 

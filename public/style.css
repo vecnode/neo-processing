@@ -104,6 +104,11 @@ body {
   background: #efefef;
 }
 
+.right-panel {
+  overflow: hidden;
+  padding: 0;
+}
+
 .code-editor {
   width: 100%;
   height: 100%;

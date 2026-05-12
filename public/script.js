@@ -238,6 +238,60 @@ window.addEventListener("resize", () => {
 
 
 
+function runSketch() {
+  const code = getEditorContents();
+  const rightPanel = document.querySelector(".right-panel");
+  if (!rightPanel) {
+    appendStatus("Error: render panel not found");
+    return;
+  }
+
+  appendStatus("Running sketch...");
+
+  const existingFrame = rightPanel.querySelector("iframe");
+  if (existingFrame) {
+    existingFrame.remove();
+  }
+
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText = "width:100%;height:100%;border:none;background:#fff;";
+  iframe.sandbox = "allow-scripts allow-same-origin";
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>body { margin: 0; overflow: hidden; }</style>
+  <script src="/libs/p5-1.11.3.min.js"><\/script>
+</head>
+<body>
+  <script>
+    window.onerror = function(msg, src, line) {
+      window.parent.postMessage({ type: 'sketch-error', message: msg + ' (line ' + line + ')' }, '*');
+    };
+    ${code}
+  <\/script>
+</body>
+</html>`;
+
+  iframe.srcdoc = html;
+  rightPanel.appendChild(iframe);
+}
+
+window.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "sketch-error") {
+    appendStatus(`Sketch error: ${event.data.message}`);
+  }
+});
+
+const runButton = document.getElementById("run-button");
+if (runButton) {
+  runButton.addEventListener("click", (event) => {
+    runSketch();
+    event.stopPropagation();
+  });
+}
+
 if (hamburgerButton) {
   hamburgerButton.addEventListener("click", toggleSidebar);
 }
