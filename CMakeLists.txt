@@ -3,6 +3,7 @@ project(webview-boost-app CXX)
 set(CMAKE_CXX_STANDARD 20)
 
 include(FetchContent)
+cmake_policy(SET CMP0135 NEW)
 
 # Lightweight HTTP server.
 FetchContent_Declare(httplib

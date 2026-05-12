@@ -17,6 +17,7 @@
     <div class="main-layout">
       <header class="top-row">
         <nav class="menu-bar" aria-label="Application menu">
+          <button id="run-button" class="menu-button run-button" type="button" aria-label="Run sketch">&gt;</button>
           <div class="menu-group">
             <button class="menu-button" type="button" aria-haspopup="true" aria-expanded="false" data-menu="file-menu">File</button>
             <ul class="menu-list" id="file-menu" role="menu" hidden>
@@ -42,13 +43,17 @@
       </header>
 
       <main class="middle-row" id="middle-row">
+
         <section class="middle-panel left-panel" aria-label="Main workspace">
-
+          <div id="ace-editor" class="code-editor"></div>
         </section>
+
         <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" aria-label="Resize panels" tabindex="0"></div>
+        
         <section class="middle-panel right-panel" aria-label="Details panel">
-
+          <!-- CODE RENDER WILL COME HERE -->
         </section>
+
       </main>
 
       <footer class="bottom-row">
@@ -58,6 +63,10 @@
     </div>
   </div>
 
+  <script src="/libs/ace.js"></script>
+  <script src="/libs/theme-textmate-css.js"></script>
+  <script src="/libs/theme-textmate.js"></script>
+  <script src="/libs/mode-javascript.js"></script>
   <script src="/script.js"></script>
 </body>
 </html>

@@ -6,8 +6,12 @@
 #include <boost/asio.hpp>
 
 #include <chrono>
+#include <ctime>
 #include <filesystem>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <thread>
 
@@ -131,6 +135,37 @@ void schedule_heartbeat(boost::asio::steady_timer &timer,
   });
 }
 
+std::string build_output_filename() {
+  const auto now = std::chrono::system_clock::now();
+  const auto time = std::chrono::system_clock::to_time_t(now);
+
+  std::tm local_time{};
+#ifdef _WIN32
+  localtime_s(&local_time, &time);
+#else
+  localtime_r(&time, &local_time);
+#endif
+
+  std::ostringstream stream;
+  stream << std::put_time(&local_time, "%Y-%m-%d-%H-%M-%S") << "_p5.js";
+  return stream.str();
+}
+
+std::filesystem::path save_script_to_outputs(const std::string &contents) {
+  const auto output_dir = std::filesystem::current_path() / "outputs";
+  std::filesystem::create_directories(output_dir);
+
+  const auto output_path = output_dir / build_output_filename();
+  std::ofstream stream(output_path, std::ios::binary);
+  stream << contents;
+
+  if (!stream) {
+    throw std::runtime_error("Failed to write script file");
+  }
+
+  return output_path;
+}
+
 int main() {
   // Boost.Asio io_context — owns all async operations.
   boost::asio::io_context ioc;
@@ -153,6 +188,22 @@ int main() {
 
   server.Get("/api/hello", [](const httplib::Request &, httplib::Response &res) {
     res.set_content("hello world", "text/plain");
+  });
+
+  server.Post("/api/save-script", [](const httplib::Request &req, httplib::Response &res) {
+    if (req.body.empty()) {
+      res.status = 400;
+      res.set_content("Editor is empty", "text/plain");
+      return;
+    }
+
+    try {
+      const auto saved_path = save_script_to_outputs(req.body);
+      res.set_content(saved_path.filename().string(), "text/plain");
+    } catch (const std::exception &ex) {
+      res.status = 500;
+      res.set_content(ex.what(), "text/plain");
+    }
   });
 
   // Serve embedded static assets from public/.

@@ -1,3 +1,4 @@
+// vecnode 2026-05-12
 
 const terminalOutput = document.getElementById("terminal");
 const menuButtons = document.querySelectorAll(".menu-button");
@@ -8,8 +9,11 @@ const sidePanel = document.getElementById("side-panel");
 const statusContainer = document.querySelector(".bottom-row");
 const middleRow = document.getElementById("middle-row");
 const splitter = document.getElementById("splitter");
+const aceEditorContainer = document.getElementById("ace-editor");
+const runButton = document.getElementById("run-button");
 
 let isResizingPanels = false;
+let aceEditor = null;
 
 function setLeftPanelSize(percent) {
   if (!middleRow) {
@@ -79,6 +83,82 @@ function updateSplitFromPointer(clientX) {
   setLeftPanelSize(percent);
 }
 
+function resetEditorToDefault() {
+  if (!aceEditor) {
+    return;
+  }
+
+  aceEditor.session.setValue(defaultCode);
+  aceEditor.clearSelection();
+  aceEditor.focus();
+  appendStatus("New file created");
+}
+
+function openLocalFilePicker() {
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = ".js,.txt,.json,.html,.css,.md,.xml,.ts,.tsx,.jsx,*/*";
+  fileInput.style.display = "none";
+
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file || !aceEditor) {
+      fileInput.remove();
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const contents = typeof reader.result === "string" ? reader.result : "";
+      aceEditor.session.setValue(contents);
+      aceEditor.clearSelection();
+      aceEditor.focus();
+      appendStatus(`Opened ${file.name}`);
+      fileInput.remove();
+    };
+    reader.onerror = () => {
+      appendStatus(`Failed to open ${file.name}`);
+      fileInput.remove();
+    };
+    reader.readAsText(file);
+  }, { once: true });
+
+  document.body.appendChild(fileInput);
+  fileInput.click();
+}
+
+async function saveEditorToOutputs() {
+  if (!aceEditor) {
+    return;
+  }
+
+  const contents = aceEditor.getValue();
+  if (!contents.trim()) {
+    appendStatus("Nothing to save");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/save-script", {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+      },
+      body: contents,
+    });
+
+    const result = await response.text();
+    if (!response.ok) {
+      appendStatus(`Save failed: ${result}`);
+      return;
+    }
+
+    appendStatus(`Saved outputs/${result}`);
+  } catch (error) {
+    appendStatus(`Save failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+  }
+}
+
 
 
 
@@ -101,7 +181,15 @@ menuButtons.forEach((button) => {
 
 menuItems.forEach((item) => {
   item.addEventListener("click", () => {
-    appendStatus(`${item.dataset.action} clicked`);
+    if (item.dataset.action === "New file") {
+      resetEditorToDefault();
+    } else if (item.dataset.action === "Open file") {
+      openLocalFilePicker();
+    } else if (item.dataset.action === "Save file") {
+      saveEditorToOutputs();
+    } else {
+      appendStatus(`${item.dataset.action} clicked`);
+    }
     closeMenus();
   });
 });
@@ -123,6 +211,13 @@ document.addEventListener("keydown", (event) => {
 
 if (hamburgerButton) {
   hamburgerButton.addEventListener("click", toggleSidebar);
+}
+
+if (runButton) {
+  runButton.addEventListener("click", () => {
+    closeMenus();
+    appendStatus("hello-world");
+  });
 }
 
 if (splitter && middleRow) {
@@ -157,3 +252,36 @@ if (splitter && middleRow) {
 }
 
 setLeftPanelSize(50);
+
+// Default p5js code
+
+const defaultCode = `function setup() {
+
+}
+
+function draw() {
+}`;
+
+if (window.ace && aceEditorContainer) {
+  aceEditor = ace.edit(aceEditorContainer);
+
+  aceEditor.setTheme("ace/theme/textmate");
+  aceEditor.session.setMode("ace/mode/javascript");
+  aceEditor.session.setUseWorker(false);
+  aceEditor.setOptions({
+    showGutter: true,
+    showFoldWidgets: true,
+    showPrintMargin: false,
+    highlightActiveLine: true,
+    fontSize: "13px",
+    useSoftTabs: true,
+    tabSize: 2,
+  });
+  aceEditor.session.setValue(defaultCode);
+  aceEditor.clearSelection();
+  aceEditor.resize();
+
+  window.addEventListener("resize", () => {
+    aceEditor.resize();
+  });
+}
