@@ -7,6 +7,13 @@
     "isLocal": true
   },
   {
+    "id": "p5-2.3.0",
+    "name": "p5.js v2.3.0 (online)",
+    "version": "2.3.0",
+    "url": "https://cdn.jsdelivr.net/npm/p5@2.3.0/lib/p5.min.js",
+    "isLocal": false
+  },
+  {
     "id": "p5-1.9.4",
     "name": "p5.js v1.9.4 (online)",
     "version": "1.9.4",
