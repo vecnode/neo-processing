@@ -1,0 +1,30 @@
+[
+  {
+    "id": "p5-1.11.3-bundled",
+    "name": "p5.js v1.11.3 (bundled)",
+    "version": "1.11.3",
+    "url": "/libs/p5-1.11.3.min.js",
+    "isLocal": true
+  },
+  {
+    "id": "p5-1.9.4",
+    "name": "p5.js v1.9.4 (online)",
+    "version": "1.9.4",
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js",
+    "isLocal": false
+  },
+  {
+    "id": "p5-1.7.0",
+    "name": "p5.js v1.7.0 (online)",
+    "version": "1.7.0",
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js",
+    "isLocal": false
+  },
+  {
+    "id": "p5-1.4.2",
+    "name": "p5.js v1.4.2 (online)",
+    "version": "1.4.2",
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js",
+    "isLocal": false
+  }
+]

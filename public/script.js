@@ -12,9 +12,16 @@ const aceContainer = document.getElementById("ace-editor");
 const editorMeta = document.getElementById("editor-meta");
 
 // Version of the bundled p5.js library (public/libs/p5-<version>.min.js).
-// Single source of truth: drives both the version label and the <script>
-// the sketch iframe loads.
+// Single source of truth for the default build the sketch iframe loads.
 const P5_VERSION = "1.11.3";
+
+// The p5.js build currently injected into sketches. Defaults to the bundled,
+// offline copy; the Libraries panel can swap it (see public/libraries.json).
+let activeLibrary = {
+  name: `p5.js v${P5_VERSION} (bundled)`,
+  url: `/libs/p5-${P5_VERSION}.min.js`,
+  isLocal: true,
+};
 
 const defaultSketch = `// Start your sketch
 function setup() {
@@ -83,6 +90,42 @@ function draw() {
   fill(37, 99, 235);
   rect(0, 0, 150, 150);
 }`,
+  "Random walker": `// Random walker
+let x, y;
+
+function setup() {
+  createCanvas(400, 400);
+  background(20);
+  x = width / 2;
+  y = height / 2;
+}
+
+function draw() {
+  stroke(37, 99, 235);
+  strokeWeight(2);
+  point(x, y);
+  x = constrain(x + random(-4, 4), 0, width);
+  y = constrain(y + random(-4, 4), 0, height);
+}`,
+  "Particle swarm": `// Particle swarm
+let particles = [];
+
+function setup() {
+  createCanvas(400, 400);
+  for (let i = 0; i < 80; i++) {
+    particles.push({ a: random(TWO_PI), r: random(40, 180), s: random(0.005, 0.02) });
+  }
+}
+
+function draw() {
+  background(20, 40);
+  noStroke();
+  fill(37, 99, 235);
+  for (const p of particles) {
+    p.a += p.s;
+    circle(width / 2 + cos(p.a) * p.r, height / 2 + sin(p.a) * p.r, 6);
+  }
+}`,
 };
 
 let isResizingPanels = false;
@@ -94,6 +137,8 @@ let isRecording = false;
 const recordButton = document.getElementById("record-button");
 const captureButton = document.getElementById("capture-button");
 const fullscreenButton = document.getElementById("fullscreen-button");
+const librarySelect = document.getElementById("library-select");
+const libraryApplyButton = document.getElementById("library-apply");
 
 function initializeEditor() {
   if (!aceContainer || typeof ace === "undefined") {
@@ -175,6 +220,70 @@ function loadExample(name) {
   setEditorContents(code);
   appendStatus(`Loaded example: ${name}`);
   runSketch();
+}
+
+// Updates the label under the editor to show which p5.js build is active.
+function setLibraryLabel() {
+  if (editorMeta) {
+    editorMeta.textContent = activeLibrary.name;
+  }
+}
+
+// Populates the Libraries dropdown from public/libraries.json. The manifest is
+// the allow-list of injectable builds (see issue #3).
+async function loadLibraryManifest() {
+  if (!librarySelect) {
+    return;
+  }
+
+  try {
+    const response = await fetch("/libraries.json");
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const libraries = await response.json();
+    librarySelect.innerHTML = "";
+    libraries.forEach((lib) => {
+      if (!lib || !lib.url) {
+        return;
+      }
+
+      const option = document.createElement("option");
+      option.value = lib.url;
+      option.textContent = lib.name || lib.url;
+      option.dataset.name = lib.name || lib.url;
+      option.dataset.local = String(Boolean(lib.isLocal));
+      if (lib.url === activeLibrary.url) {
+        option.selected = true;
+      }
+      librarySelect.appendChild(option);
+    });
+  } catch (error) {
+    appendStatus(`Could not load library list: ${error.message}`);
+  }
+}
+
+// Applies the selected p5.js build: future sketch runs load it, the editor
+// label updates, and any running sketch is reloaded so it takes effect now.
+function applyLibrary() {
+  if (!librarySelect || !librarySelect.selectedOptions.length) {
+    return;
+  }
+
+  const option = librarySelect.selectedOptions[0];
+  activeLibrary = {
+    name: option.dataset.name || option.textContent,
+    url: option.value,
+    isLocal: option.dataset.local === "true",
+  };
+
+  setLibraryLabel();
+  appendStatus(`Library set to ${activeLibrary.name}`);
+
+  if (sketchFrame) {
+    runSketch();
+  }
 }
 
 async function saveSketch() {
@@ -454,7 +563,7 @@ function runSketch() {
       justify-content: center;
     }
   </style>
-  <script src="/libs/p5-${P5_VERSION}.min.js"><\/script>
+  <script src="${activeLibrary.url}"><\/script>
 </head>
 <body>
   <script>
@@ -609,6 +718,10 @@ if (fullscreenButton) {
   fullscreenButton.addEventListener("click", toggleFullscreen);
 }
 
+if (libraryApplyButton) {
+  libraryApplyButton.addEventListener("click", applyLibrary);
+}
+
 const runButton = document.getElementById("run-button");
 if (runButton) {
   runButton.addEventListener("click", (event) => {
@@ -652,9 +765,8 @@ if (splitter && middleRow) {
   });
 }
 
-if (editorMeta) {
-  editorMeta.textContent = `p5.js v${P5_VERSION}`;
-}
+setLibraryLabel();
+loadLibraryManifest();
 
 setLeftPanelSize(50);
 initializeEditor();
