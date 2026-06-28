@@ -67,3 +67,8 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Local sketch & media outputs (saved scripts, PNG captures, WebM recordings).
+# Generated at runtime and kept local — only the folder's README is tracked.
+outputs/*
+!outputs/README.md

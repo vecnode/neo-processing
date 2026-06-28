@@ -10,16 +10,27 @@
   <div class="app-shell">
     <aside class="side-panel" id="side-panel" aria-hidden="true">
       <div class="side-panel-inner">
-        <h2>Capture</h2>
-        <div class="panel-controls">
-          <button id="record-button" class="panel-button" type="button" aria-pressed="false">
-            <span class="rec-dot" aria-hidden="true"></span>
-            <span class="rec-label">Record</span>
-          </button>
-          <button id="capture-button" class="panel-button" type="button">Capture PNG</button>
-          <button id="fullscreen-button" class="panel-button" type="button">Fullscreen</button>
-        </div>
-        <p class="panel-hint" id="capture-hint">Run a sketch, then record video or capture a frame. Files are saved to <code>outputs/</code>.</p>
+        <section class="panel-section">
+          <h2>Capture</h2>
+          <div class="panel-controls">
+            <button id="record-button" class="panel-button" type="button" aria-pressed="false">
+              <span class="rec-dot" aria-hidden="true"></span>
+              <span class="rec-label">Record</span>
+            </button>
+            <button id="capture-button" class="panel-button" type="button">Capture PNG</button>
+            <button id="fullscreen-button" class="panel-button" type="button">Fullscreen</button>
+          </div>
+          <p class="panel-hint" id="capture-hint">Run a sketch, then record video or capture a frame. Files are saved to <code>outputs/</code>.</p>
+        </section>
+
+        <section class="panel-section">
+          <h2>Libraries</h2>
+          <div class="panel-controls panel-row">
+            <select id="library-select" class="panel-select" aria-label="p5.js library"></select>
+            <button id="library-apply" class="panel-button panel-button-inline" type="button">Apply</button>
+          </div>
+          <p class="panel-hint">Choose a p5.js build to load into your sketches. Online builds require a connection.</p>
+        </section>
       </div>
     </aside>
 
@@ -41,6 +52,8 @@
               <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Bouncing ball">Bouncing ball</button></li>
               <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Sine wave">Sine wave</button></li>
               <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Spinning square">Spinning square</button></li>
+              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Random walker">Random walker</button></li>
+              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Particle swarm">Particle swarm</button></li>
             </ul>
           </div>
         </nav>

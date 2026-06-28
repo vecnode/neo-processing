@@ -44,7 +44,10 @@ runtime.
 - **`public/`** — the frontend, embedded into the binary via `cpp-embedlib`:
   - `index.html` — layout: menu bar (Run, File, Examples), Ace editor + p5
     version label (left), sketch preview (right), status/terminal row (bottom),
-    collapsible side panel with Record / Capture PNG / Fullscreen controls.
+    collapsible side panel with a Capture section (Record / Capture PNG /
+    Fullscreen) and a Libraries section (p5.js build picker).
+  - `libraries.json` — manifest of injectable p5.js builds (`{ id, name,
+    version, url, isLocal }`); see the Libraries section below.
   - `script.js` — all UI logic: editor setup, menus, file open/save, panel
     splitter, the sketch runner, and the capture/fullscreen controls.
   - `style.css` — styling.
@@ -118,6 +121,23 @@ pane (`.right-panel`), not the sandboxed iframe — so it needs no iframe
 fullscreen permission. The sketch iframe's body centres its canvas on a white
 background, so fullscreen shows the canvas at its exact pixel size in the middle
 of the screen. Esc exits via the browser default.
+
+### Libraries (p5.js build selection)
+
+The side panel's **Libraries** section lets the user choose which p5.js build the
+sketch iframe loads. The options come from `public/libraries.json` — a manifest
+of `{ id, name, version, url, isLocal }` entries that doubles as the **allow-list**
+of injectable builds (the JS-first approach from issue #3). `script.js` tracks the
+chosen build in `activeLibrary`; `runSketch()` uses `activeLibrary.url` for the
+iframe's p5 `<script>`, and the label under the editor reflects it. **Apply** swaps
+the active build and reloads any running sketch.
+
+The bundled build (`/libs/p5-1.11.3.min.js`, `isLocal: true`) is the default and
+keeps the app fully offline. Selecting an online build loads p5 from a CDN — this
+trades offline-first for version flexibility and is loaded inside the same
+sandboxed, opaque-origin iframe (so it cannot reach the parent or the local API).
+Keep the bundled entry's `version`/`url` in sync with the actual file in
+`public/libs/` and with `P5_VERSION` in `script.js`.
 
 ## Build & run
 
