@@ -123,17 +123,10 @@ void apply_linux_icon(webview::webview &w) {
 }
 #endif
 
-// Schedules a recurring Boost.Asio steady_timer that fires every `interval`.
-// Automatically reschedules itself until the io_context is stopped.
-void schedule_heartbeat(boost::asio::steady_timer &timer,
-                        std::chrono::seconds interval) {
-  timer.expires_after(interval);
-  timer.async_wait([&timer, interval](const boost::system::error_code &ec) {
-    if (ec) return; // cancelled or destroyed
-    std::cout << "[asio] heartbeat" << std::endl;
-    schedule_heartbeat(timer, interval);
-  });
-}
+// Largest script body accepted by /api/save-script. The HTTP server enforces
+// the same limit at the transport layer; this constant is the second line of
+// defence inside the handler.
+constexpr size_t kMaxScriptBytes = 5 * 1024 * 1024; // 5 MiB
 
 std::string build_output_filename() {
   const auto now = std::chrono::system_clock::now();
@@ -167,51 +160,61 @@ std::filesystem::path save_script_to_outputs(const std::string &contents) {
 }
 
 int main() {
-  // Boost.Asio io_context — owns all async operations.
+  // Boost.Asio io_context — reserved as the foundation for future async work
+  // (timers, networking, background jobs). The work guard keeps it alive even
+  // while idle so handlers can be posted to it without the run loop exiting.
   boost::asio::io_context ioc;
-
-  // Keep the io_context alive even when no async work is pending.
   auto work_guard = boost::asio::make_work_guard(ioc);
-
-  // Periodic timer: fires every 5 seconds and logs a heartbeat.
-  boost::asio::steady_timer heartbeat_timer{ioc};
-  schedule_heartbeat(heartbeat_timer, std::chrono::seconds{5});
 
   // Run the io_context on a dedicated thread so it never blocks the UI thread.
   std::thread asio_thread([&ioc]() { ioc.run(); });
 
   httplib::Server server;
 
-  server.Get("/health", [](const httplib::Request &, httplib::Response &res) {
-    res.set_content("ok", "text/plain");
-  });
+  // Cap request bodies at the transport layer and bound how long a single
+  // request may hold a worker, so a slow or oversized client cannot stall
+  // the local server.
+  server.set_payload_max_length(kMaxScriptBytes);
+  server.set_read_timeout(10, 0);  // 10 s
+  server.set_write_timeout(30, 0); // 30 s
 
-  server.Get("/api/hello", [](const httplib::Request &, httplib::Response &res) {
-    res.set_content("hello world", "text/plain");
+  server.Get("/health", [](const httplib::Request &, httplib::Response &res) {
+    res.set_content("ok", "text/plain; charset=utf-8");
   });
 
   server.Post("/api/save-script", [](const httplib::Request &req, httplib::Response &res) {
     if (req.body.empty()) {
       res.status = 400;
-      res.set_content("Editor is empty", "text/plain");
+      res.set_content("Editor is empty", "text/plain; charset=utf-8");
+      return;
+    }
+
+    if (req.body.size() > kMaxScriptBytes) {
+      res.status = 413;
+      res.set_content("Script too large", "text/plain; charset=utf-8");
       return;
     }
 
     try {
       const auto saved_path = save_script_to_outputs(req.body);
-      res.set_content(saved_path.filename().string(), "text/plain");
+      res.set_content(saved_path.filename().string(), "text/plain; charset=utf-8");
     } catch (const std::exception &ex) {
+      std::cerr << "[save-script] " << ex.what() << std::endl;
       res.status = 500;
-      res.set_content(ex.what(), "text/plain");
+      res.set_content("Failed to save script", "text/plain; charset=utf-8");
     }
   });
 
   // Serve embedded static assets from public/.
   httplib::mount(server, Web::FS);
 
+  // Bind to loopback only — the server must never be reachable off-host.
   auto port = server.bind_to_any_port("127.0.0.1");
   if (port <= 0) {
     std::cerr << "Failed to bind HTTP server" << std::endl;
+    work_guard.reset();
+    ioc.stop();
+    asio_thread.join();
     return 1;
   }
 
@@ -232,9 +235,9 @@ int main() {
   server.stop();
   server_thread.join();
 
-  // Shut down Asio cleanly.
+  // Shut down Asio cleanly: release the work guard so run() can drain, then
+  // stop the context and join its thread.
   work_guard.reset();
-  heartbeat_timer.cancel();
   ioc.stop();
   asio_thread.join();
 

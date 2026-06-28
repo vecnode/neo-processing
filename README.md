@@ -1,72 +1,141 @@
 # neo-processing
 
-Under heavy development.
+> A native desktop editor and live runtime for [p5.js](https://p5js.org/)
+> sketches — a modern, JavaScript-based alternative to the Java Processing IDE.
 
-NeoProcessing (neo-processing) aims to replace Java-based Processing IDE and application creator, using `p5.js`. 
+![neo-processing editor with a live sketch preview](./assets/img2.png)
 
-Desktop app with `webview`, local HTTP server, and embedded static assets.
+neo-processing ships as a **single self-contained executable**. It embeds a code
+editor and a live preview into a native desktop window, so you can write a p5.js
+sketch on the left and watch it run on the right, with the goal of real-world,
+full-screen deployment.
 
-When ready, this application will allow to program JavaScript with `p5.js` libraries and use full-screen rendering for real-world deployment. There are also plans to generate independent applications without the editor and interface for each sketch. In the near future it will allow to add arbitrary JavaScript libraries.
+> **Status:** active development. Interfaces and features may change.
 
-![image](./assets/img2.png)
+## Features
 
+- **Native desktop app** — one executable, no browser or Node.js runtime
+  required. Uses the OS webview (WebView2 on Windows, WebKitGTK on Linux).
+- **Embedded editor** — syntax-highlighting code editor ([Ace](https://ace.c9.io/))
+  with a resizable split between source and preview.
+- **Live sketch preview** — run your sketch instantly in an isolated, sandboxed
+  preview pane.
+- **Local-first & offline** — the frontend and p5.js are embedded into the
+  binary and served from a loopback HTTP server; nothing is fetched at runtime.
+- **Save to disk** — export the current sketch to a timestamped `.js` file under
+  `outputs/`.
 
-## Reproduce
+### Roadmap
+
+- Full-screen rendering for deployed installations.
+- Exporting standalone, editor-free applications per sketch.
+- Loading arbitrary additional JavaScript libraries.
+
+## Architecture
+
+neo-processing is a single C++ process:
+
+1. A local HTTP server ([cpp-httplib](https://github.com/yhirose/cpp-httplib))
+   binds to `127.0.0.1` on an OS-assigned port.
+2. The web frontend (`public/`) is **embedded into the binary at build time**
+   and served from that server.
+3. A native [webview](https://github.com/webview/webview) window displays the
+   frontend.
+
+User sketches run in a `sandbox="allow-scripts"` iframe (opaque origin), so
+sketch code cannot reach the local HTTP API, cookies, or storage. The server
+listens on loopback only and caps request sizes.
+
+For a deeper description of the codebase, see [AGENTS.md](./AGENTS.md).
+
+## Getting started
+
+### Prerequisites
+
+| Requirement      | Notes |
+|------------------|-------|
+| CMake ≥ 3.20     | Build system. |
+| C++20 compiler   | Windows: Visual Studio 2022 Build Tools (MSVC). Linux: GCC or Clang. |
+| Git              | Required — CMake `FetchContent` downloads dependencies from Git. |
+| Internet access  | Needed on the **first** configure to download dependencies. |
+
+**Windows runtime:** Microsoft Edge WebView2 Runtime.
+
+**Linux build/runtime libraries:** GTK 3 and WebKit2GTK development files, e.g.
 
 ```sh
-# Windows:
+# Debian/Ubuntu
+sudo apt install build-essential cmake git libgtk-3-dev libwebkit2gtk-4.1-dev
+```
+
+### Build and run
+
+```sh
+# Configure (downloads dependencies on first run)
 cmake -B build
 
-cmake --build build --target neo-processing -j --config Debug
-.\build\Debug\neo-processing.exe
-
+# Build
 cmake --build build --target neo-processing -j --config Release
-.\build\Release\neo-processing.exe
 
-# Windows helper script:
+# Run
+#   Windows: .\build\Release\neo-processing.exe
+#   Linux:   ./build/neo-processing
+```
+
+Use `--config Debug` (and the `Debug` output folder) for a debug build.
+
+#### Helper scripts
+
+```sh
+# Windows — initialises the MSVC environment, configures, builds Debug, and runs.
 .\build_and_run.bat
 
-# Linux:
-cmake -B build
-
-cmake --build build --target neo-processing -j --config Debug
-./build/neo-processing
-
-cmake --build build --target neo-processing -j --config Release
-./build/neo-processing
-
-# Linux helper script (same flow):
+# Linux — configures, builds Debug, and runs.
 ./build_and_run.sh
 ```
 
+> `build_and_distribute.bat` is a placeholder for the future Release packaging
+> pipeline and is not yet implemented.
 
-## Development
+## Dependencies
 
-Build/runtime prerequisites:
+Downloaded automatically into the build tree (`build/_deps/`) at configure time;
+not committed to the repository:
 
-- CMake 3.20+
-- C++20 compiler
-	- Windows: Visual Studio 2022 Build Tools (MSVC)
-	- Linux: GCC or Clang with C++20 support
-- Git (required because CMake `FetchContent` downloads several dependencies from Git repositories)
-- Internet access during initial configure/build (to download dependencies)
-- Windows runtime:
-	- Microsoft Edge WebView2 Runtime
-- Linux runtime/build libs (webview GTK backend):
-	- GTK 3 development files
-	- WebKit2GTK development files
+| Dependency | Purpose |
+|------------|---------|
+| [cpp-httplib](https://github.com/yhirose/cpp-httplib) | Local HTTP server. |
+| [webview](https://github.com/webview/webview) | Native desktop window + system webview. |
+| [cpp-embedlib](https://github.com/yhirose/cpp-embedlib) | Embeds `public/` into the executable. |
+| Boost (`asio`, `system`) | Async infrastructure thread. |
 
-Downloaded automatically at configure/build time (`FetchContent`):
+The frontend libraries in `public/libs/` (Ace, p5.js) are vendored and committed.
 
-- `yhirose/cpp-httplib`
-	- https://github.com/yhirose/cpp-httplib
-- `webview/webview`
-	- https://github.com/webview/webview
-- `yhirose/cpp-embedlib`
-	- https://github.com/yhirose/cpp-embedlib
+## Project layout
 
-Notes:
+```
+src/main.cpp        C++ application: HTTP routes, window, shutdown
+public/             Frontend, embedded into the binary at build time
+  index.html        Layout
+  script.js         Editor, menus, file I/O, sketch runner
+  style.css         Styling
+  libs/             Vendored Ace + p5.js
+outputs/            Saved sketches (runtime output)
+icons/              Application icons
+assets/             README images
+CMakeLists.txt      Build configuration
+AGENTS.md           Detailed guide for contributors and AI agents
+```
 
-- These dependencies are fetched into the CMake build tree (`build/_deps/`) and are not committed to this repository.
-- Frontend files in `public/` are embedded into the executable with `cpp-embedlib` and served through the app's local HTTP server.
+## Troubleshooting
 
+- **Windows: MinGW/MSYS2 header conflicts** (`corecrt.h` / `winnt.h` errors). MSVC
+  is picking up MinGW headers. Build from a clean *Developer Command Prompt for
+  VS*, or use `build_and_run.bat`, which sanitises the environment.
+- **Windows: "Windows SDK version … was not found".** A stale `build/CMakeCache.txt`
+  references an SDK that is no longer installed. Delete the cache and reconfigure
+  (or run `build_and_run.bat`, which clears it automatically).
+
+## License
+
+Released under the MIT License. See [LICENSE](./LICENSE).
