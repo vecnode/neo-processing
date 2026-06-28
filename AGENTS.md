@@ -45,7 +45,7 @@ runtime.
   - `index.html` — layout: menu bar (Run, File, Examples), Ace editor + p5
     version label (left), sketch preview (right), status/terminal row (bottom),
     collapsible side panel with a Capture section (Record / Capture PNG /
-    Fullscreen) and a Libraries section (p5.js build picker).
+    Full Window / Fullscreen) and a Libraries section (p5.js build picker).
   - `libraries.json` — manifest of injectable p5.js builds (`{ id, name,
     version, url, isLocal }`); see the Libraries section below.
   - `script.js` — all UI logic: editor setup, menus, file open/save, panel
@@ -116,11 +116,19 @@ support varies by version). Known limitation: capture of **WEBGL** sketches may
 be blank because p5 does not set `preserveDrawingBuffer` (this affects both the
 PNG snapshot and the per-frame `drawImage` used for recording).
 
-**Fullscreen** (side-panel button) calls `requestFullscreen()` on the preview
-pane (`.right-panel`), not the sandboxed iframe — so it needs no iframe
+There are two fullscreen modes, both calling `requestFullscreen()` on the preview
+pane (`.right-panel`), not the sandboxed iframe — so neither needs an iframe
 fullscreen permission. The sketch iframe's body centres its canvas on a white
-background, so fullscreen shows the canvas at its exact pixel size in the middle
-of the screen. Esc exits via the browser default.
+background, so the canvas shows at its exact pixel size in the middle. Esc exits.
+
+- **Full Window** fills the WebView viewport (the app's content area). The native
+  window is untouched, so it covers only the app window.
+- **Fullscreen** does the same *and* drives the native OS window into borderless
+  full-screen via `window.neoSetDesktopFullscreen(bool)` — a function bound in
+  C++ (`main.cpp`) that strips the window frame and stretches it over the monitor
+  (Win32) or calls `gtk_window_fullscreen` (Linux), so the sketch covers the
+  whole desktop. On exit, the `fullscreenchange` handler restores the native
+  window. This is the only JS→C++ bridge in the app.
 
 ### Libraries (p5.js build selection)
 

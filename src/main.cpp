@@ -71,6 +71,50 @@ void apply_windows_icons(webview::webview &w) {
     SetClassLongPtrW(hwnd, GCLP_HICON, reinterpret_cast<LONG_PTR>(large_icon));
   }
 }
+
+// Toggles real (borderless) full-screen for the native window: strips the frame
+// and stretches it over the monitor, remembering the windowed style/placement so
+// it can be restored. Used for "Fullscreen" (covers the desktop), as opposed to
+// the in-app "Full Window" which only fills the WebView viewport.
+void set_desktop_fullscreen(HWND hwnd, bool enable) {
+  static bool active = false;
+  static LONG saved_style = 0;
+  static LONG saved_exstyle = 0;
+  static WINDOWPLACEMENT saved_placement{sizeof(WINDOWPLACEMENT)};
+
+  if (!hwnd) {
+    return;
+  }
+
+  if (enable && !active) {
+    saved_style = GetWindowLongW(hwnd, GWL_STYLE);
+    saved_exstyle = GetWindowLongW(hwnd, GWL_EXSTYLE);
+    GetWindowPlacement(hwnd, &saved_placement);
+
+    MONITORINFO mi{sizeof(MONITORINFO)};
+    GetMonitorInfoW(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mi);
+
+    SetWindowLongW(hwnd, GWL_STYLE,
+                   saved_style & ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX |
+                                   WS_MAXIMIZEBOX | WS_SYSMENU));
+    SetWindowLongW(hwnd, GWL_EXSTYLE,
+                   saved_exstyle & ~(WS_EX_DLGMODALFRAME | WS_EX_WINDOWEDGE |
+                                     WS_EX_CLIENTEDGE | WS_EX_STATICEDGE));
+    SetWindowPos(hwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top,
+                 mi.rcMonitor.right - mi.rcMonitor.left,
+                 mi.rcMonitor.bottom - mi.rcMonitor.top,
+                 SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    active = true;
+  } else if (!enable && active) {
+    SetWindowLongW(hwnd, GWL_STYLE, saved_style);
+    SetWindowLongW(hwnd, GWL_EXSTYLE, saved_exstyle);
+    SetWindowPlacement(hwnd, &saved_placement);
+    SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER |
+                     SWP_FRAMECHANGED);
+    active = false;
+  }
+}
 #endif
 
 #ifdef __linux__
@@ -120,6 +164,17 @@ void apply_linux_icon(webview::webview &w) {
     if (error) {
       g_error_free(error);
     }
+  }
+}
+
+void set_desktop_fullscreen(GtkWindow *gtk_window, bool enable) {
+  if (!gtk_window) {
+    return;
+  }
+  if (enable) {
+    gtk_window_fullscreen(gtk_window);
+  } else {
+    gtk_window_unfullscreen(gtk_window);
   }
 }
 #endif
@@ -307,6 +362,24 @@ int main() {
   webview::webview w(false, nullptr);
   w.set_title("neo-processing v0.1.0");
   w.set_size(1280, 720, WEBVIEW_HINT_NONE);
+
+  // Exposed to the frontend as window.neoSetDesktopFullscreen(bool): toggles the
+  // native window between windowed and borderless full-screen so the sketch can
+  // cover the whole desktop, not just the app's content area.
+  w.bind("neoSetDesktopFullscreen", [&w](const std::string &req) -> std::string {
+    const bool enable = req.find("true") != std::string::npos;
+    auto window_result = w.window();
+    if (window_result.ok()) {
+#ifdef _WIN32
+      set_desktop_fullscreen(static_cast<HWND>(window_result.value()), enable);
+#endif
+#ifdef __linux__
+      set_desktop_fullscreen(GTK_WINDOW(window_result.value()), enable);
+#endif
+    }
+    return "null";
+  });
+
 #ifdef _WIN32
   apply_windows_icons(w);
 #endif
