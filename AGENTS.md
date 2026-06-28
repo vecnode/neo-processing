@@ -42,9 +42,9 @@ runtime.
 - **`src/main.cpp`** — the entire C++ application. Entry point, HTTP routes,
   window creation, per-OS icon handling, and graceful shutdown.
 - **`public/`** — the frontend, embedded into the binary via `cpp-embedlib`:
-  - `index.html` — layout: menu bar, Ace editor + p5 version label (left), sketch
-    preview (right), status/terminal row (bottom), collapsible side panel with
-    Record / Capture PNG / Fullscreen controls.
+  - `index.html` — layout: menu bar (Run, File, Examples), Ace editor + p5
+    version label (left), sketch preview (right), status/terminal row (bottom),
+    collapsible side panel with Record / Capture PNG / Fullscreen controls.
   - `script.js` — all UI logic: editor setup, menus, file open/save, panel
     splitter, the sketch runner, and the capture/fullscreen controls.
   - `style.css` — styling.
