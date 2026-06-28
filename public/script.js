@@ -28,6 +28,63 @@ function draw() {
   circle(width / 2, height / 2, 160);
 }`;
 
+// Built-in example sketches, keyed by their Examples-menu label.
+const examples = {
+  "Bouncing ball": `// Bouncing ball
+let x, y, vx, vy, r;
+
+function setup() {
+  createCanvas(400, 400);
+  x = width / 2;
+  y = height / 2;
+  vx = 3.2;
+  vy = 2.4;
+  r = 36;
+}
+
+function draw() {
+  background(20);
+  x += vx;
+  y += vy;
+  if (x < r || x > width - r) vx *= -1;
+  if (y < r || y > height - r) vy *= -1;
+  noStroke();
+  fill(37, 99, 235);
+  circle(x, y, r * 2);
+}`,
+  "Sine wave": `// Sine wave
+function setup() {
+  createCanvas(400, 400);
+}
+
+function draw() {
+  background(20);
+  noFill();
+  stroke(37, 99, 235);
+  strokeWeight(3);
+  beginShape();
+  for (let px = 0; px <= width; px += 8) {
+    let py = height / 2 + sin(px * 0.03 + frameCount * 0.05) * 90;
+    vertex(px, py);
+  }
+  endShape();
+}`,
+  "Spinning square": `// Spinning square
+function setup() {
+  createCanvas(400, 400);
+  rectMode(CENTER);
+}
+
+function draw() {
+  background(20);
+  translate(width / 2, height / 2);
+  rotate(frameCount * 0.02);
+  noStroke();
+  fill(37, 99, 235);
+  rect(0, 0, 150, 150);
+}`,
+};
+
 let isResizingPanels = false;
 let aceEditor = null;
 let openFileInput = null;
@@ -107,6 +164,17 @@ function newSketch() {
 
 function openSketch() {
   ensureOpenFileInput().click();
+}
+
+function loadExample(name) {
+  const code = examples[name];
+  if (!code) {
+    return;
+  }
+
+  setEditorContents(code);
+  appendStatus(`Loaded example: ${name}`);
+  runSketch();
 }
 
 async function saveSketch() {
@@ -225,6 +293,8 @@ menuItems.forEach((item) => {
       saveSketch().catch((error) => {
         appendStatus(error.message);
       });
+    } else if (examples[action]) {
+      loadExample(action);
     } else {
       appendStatus(`${action} clicked`);
     }

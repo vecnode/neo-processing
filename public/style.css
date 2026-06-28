@@ -282,6 +282,10 @@ body {
   justify-content: space-between;
   gap: 8px;
   padding: 10px 12px;
+  /* Raise the whole header (and its dropdowns) above the editor below it, so
+     open menus overlay the Ace editor instead of being painted under it. */
+  position: relative;
+  z-index: 20;
 }
 
 .menu-bar {
@@ -348,7 +352,7 @@ body {
   border-radius: var(--radius);
   background: var(--panel);
   box-shadow: var(--shadow);
-  z-index: 2;
+  z-index: 50;
 }
 
 .side-panel,
