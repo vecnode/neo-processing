@@ -10,7 +10,15 @@
   <div class="app-shell">
     <aside class="side-panel" id="side-panel" aria-hidden="true">
       <div class="side-panel-inner">
-        <h2>Panel</h2>
+        <h2>Capture</h2>
+        <div class="panel-controls">
+          <button id="record-button" class="panel-button" type="button" aria-pressed="false">
+            <span class="rec-dot" aria-hidden="true"></span>
+            <span class="rec-label">Record</span>
+          </button>
+          <button id="capture-button" class="panel-button" type="button">Capture PNG</button>
+        </div>
+        <p class="panel-hint" id="capture-hint">Run a sketch, then record video or capture a frame. Files are saved to <code>outputs/</code>.</p>
       </div>
     </aside>
 

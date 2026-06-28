@@ -5,6 +5,7 @@
 
 #include <boost/asio.hpp>
 
+#include <cctype>
 #include <chrono>
 #include <ctime>
 #include <filesystem>
@@ -123,12 +124,19 @@ void apply_linux_icon(webview::webview &w) {
 }
 #endif
 
-// Largest script body accepted by /api/save-script. The HTTP server enforces
-// the same limit at the transport layer; this constant is the second line of
-// defence inside the handler.
+// Largest script body accepted by /api/save-script. The HTTP server's global
+// payload cap is set higher (to allow media uploads), so each handler enforces
+// its own tighter limit as a second line of defence.
 constexpr size_t kMaxScriptBytes = 5 * 1024 * 1024; // 5 MiB
 
-std::string build_output_filename() {
+// Largest media blob accepted by /api/save-media (PNG capture / WebM recording).
+// The body is buffered in memory by both the client and the server before being
+// written, so this also bounds peak memory use per request.
+constexpr size_t kMaxMediaBytes = 256 * 1024 * 1024; // 256 MiB
+
+// Local timestamp used to name output files. With `with_millis` the value gains
+// a millisecond suffix, which keeps rapid captures/recordings from colliding.
+std::string current_timestamp(bool with_millis) {
   const auto now = std::chrono::system_clock::now();
   const auto time = std::chrono::system_clock::to_time_t(now);
 
@@ -140,23 +148,62 @@ std::string build_output_filename() {
 #endif
 
   std::ostringstream stream;
-  stream << std::put_time(&local_time, "%Y-%m-%d-%H-%M-%S") << "_p5.js";
+  stream << std::put_time(&local_time, "%Y-%m-%d-%H-%M-%S");
+  if (with_millis) {
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        now.time_since_epoch()) %
+                    1000;
+    stream << '-' << std::setfill('0') << std::setw(3) << ms.count();
+  }
   return stream.str();
 }
 
-std::filesystem::path save_script_to_outputs(const std::string &contents) {
-  const auto output_dir = std::filesystem::current_path() / "outputs";
-  std::filesystem::create_directories(output_dir);
+std::filesystem::path outputs_dir() {
+  const auto dir = std::filesystem::current_path() / "outputs";
+  std::filesystem::create_directories(dir);
+  return dir;
+}
 
-  const auto output_path = output_dir / build_output_filename();
-  std::ofstream stream(output_path, std::ios::binary);
+void write_file(const std::filesystem::path &path, const std::string &contents) {
+  std::ofstream stream(path, std::ios::binary);
   stream << contents;
-
   if (!stream) {
-    throw std::runtime_error("Failed to write script file");
+    throw std::runtime_error("Failed to write file");
   }
+}
 
-  return output_path;
+std::filesystem::path save_script_to_outputs(const std::string &contents) {
+  const auto path = outputs_dir() / (current_timestamp(false) + "_p5.js");
+  write_file(path, contents);
+  return path;
+}
+
+// Returns a lower-cased, alphanumeric-only extension, or "" if `raw` contains
+// anything else. This guarantees the client-supplied extension can never
+// introduce a path separator or traversal sequence.
+std::string sanitize_extension(const std::string &raw) {
+  std::string ext;
+  for (unsigned char c : raw) {
+    if (!std::isalnum(c)) {
+      return {};
+    }
+    ext += static_cast<char>(std::tolower(c));
+  }
+  return ext;
+}
+
+bool is_allowed_media_extension(const std::string &ext) {
+  return ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "webm" ||
+         ext == "mp4";
+}
+
+std::filesystem::path save_media_to_outputs(const std::string &contents,
+                                            const std::string &label,
+                                            const std::string &ext) {
+  const auto path =
+      outputs_dir() / (current_timestamp(true) + "_" + label + "." + ext);
+  write_file(path, contents);
+  return path;
 }
 
 int main() {
@@ -172,10 +219,11 @@ int main() {
   httplib::Server server;
 
   // Cap request bodies at the transport layer and bound how long a single
-  // request may hold a worker, so a slow or oversized client cannot stall
-  // the local server.
-  server.set_payload_max_length(kMaxScriptBytes);
-  server.set_read_timeout(10, 0);  // 10 s
+  // request may hold a worker, so a slow or oversized client cannot stall the
+  // local server. The global cap accommodates media uploads; each handler
+  // enforces its own tighter, type-specific limit below.
+  server.set_payload_max_length(kMaxMediaBytes);
+  server.set_read_timeout(60, 0);  // 60 s (recordings can be sizable)
   server.set_write_timeout(30, 0); // 30 s
 
   server.Get("/health", [](const httplib::Request &, httplib::Response &res) {
@@ -202,6 +250,42 @@ int main() {
       std::cerr << "[save-script] " << ex.what() << std::endl;
       res.status = 500;
       res.set_content("Failed to save script", "text/plain; charset=utf-8");
+    }
+  });
+
+  // Save a captured frame (PNG) or recording (WebM) to outputs/. The binary
+  // body is written verbatim; the filename is generated server-side and the
+  // extension is validated against an allow-list, so the client never controls
+  // a path on disk.
+  server.Post("/api/save-media", [](const httplib::Request &req, httplib::Response &res) {
+    const auto ext = sanitize_extension(req.get_param_value("ext"));
+    if (!is_allowed_media_extension(ext)) {
+      res.status = 400;
+      res.set_content("Unsupported media type", "text/plain; charset=utf-8");
+      return;
+    }
+
+    if (req.body.empty()) {
+      res.status = 400;
+      res.set_content("Empty body", "text/plain; charset=utf-8");
+      return;
+    }
+
+    if (req.body.size() > kMaxMediaBytes) {
+      res.status = 413;
+      res.set_content("Media too large", "text/plain; charset=utf-8");
+      return;
+    }
+
+    const bool is_video = (ext == "webm" || ext == "mp4");
+    try {
+      const auto saved_path = save_media_to_outputs(
+          req.body, is_video ? "recording" : "capture", ext);
+      res.set_content(saved_path.filename().string(), "text/plain; charset=utf-8");
+    } catch (const std::exception &ex) {
+      std::cerr << "[save-media] " << ex.what() << std::endl;
+      res.status = 500;
+      res.set_content("Failed to save media", "text/plain; charset=utf-8");
     }
   });
 

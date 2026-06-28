@@ -12,16 +12,24 @@ const aceContainer = document.getElementById("ace-editor");
 
 const defaultSketch = `// Start your sketch
 function setup() {
-  
+  createCanvas(400, 400);
 }
 
 function draw() {
-  
+  background(20);
+  noStroke();
+  fill(217, 119, 87);
+  circle(width / 2, height / 2, 160);
 }`;
 
 let isResizingPanels = false;
 let aceEditor = null;
 let openFileInput = null;
+let sketchFrame = null;
+let isRecording = false;
+
+const recordButton = document.getElementById("record-button");
+const captureButton = document.getElementById("capture-button");
 
 function initializeEditor() {
   if (!aceContainer || typeof ace === "undefined") {
@@ -238,6 +246,68 @@ window.addEventListener("resize", () => {
 
 
 
+// Capture/record controller injected into every sketch iframe. Because the
+// iframe is sandboxed to an opaque origin, the parent cannot touch its canvas
+// directly — instead we record/snapshot here (using the GPU-backed
+// MediaRecorder / toBlob APIs) and ship the resulting bytes out via postMessage.
+const captureController = `
+(function () {
+  var recorder = null;
+  var chunks = [];
+  function canvas() { return document.querySelector('canvas'); }
+  function send(type, extra, transfer) {
+    var msg = Object.assign({ type: type }, extra || {});
+    parent.postMessage(msg, '*', transfer || []);
+  }
+  function pickMime() {
+    var c = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+    for (var i = 0; i < c.length; i++) {
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported(c[i])) return c[i];
+    }
+    return '';
+  }
+  window.addEventListener('message', function (event) {
+    var data = event.data || {};
+    if (data.type === 'capture-png') {
+      var el = canvas();
+      if (!el) { send('capture-error', { message: 'No canvas in sketch' }); return; }
+      el.toBlob(function (blob) {
+        if (!blob) { send('capture-error', { message: 'Snapshot failed' }); return; }
+        blob.arrayBuffer().then(function (buf) {
+          send('capture-complete', { buffer: buf, ext: 'png' }, [buf]);
+        });
+      }, 'image/png');
+    } else if (data.type === 'record-start') {
+      var el2 = canvas();
+      if (!el2) { send('record-error', { message: 'No canvas in sketch' }); return; }
+      if (!el2.captureStream || !window.MediaRecorder) {
+        send('record-error', { message: 'Recording not supported by this webview' });
+        return;
+      }
+      if (recorder && recorder.state !== 'inactive') return;
+      var mime = pickMime();
+      try {
+        var stream = el2.captureStream(data.fps || 60);
+        recorder = mime ? new MediaRecorder(stream, { mimeType: mime })
+                        : new MediaRecorder(stream);
+      } catch (err) { send('record-error', { message: String(err) }); return; }
+      chunks = [];
+      recorder.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+      recorder.onstop = function () {
+        var blob = new Blob(chunks, { type: (recorder && recorder.mimeType) || 'video/webm' });
+        blob.arrayBuffer().then(function (buf) {
+          send('recording-complete', { buffer: buf, ext: 'webm' }, [buf]);
+        });
+      };
+      recorder.start();
+      send('record-started', {});
+    } else if (data.type === 'record-stop') {
+      if (recorder && recorder.state !== 'inactive') recorder.stop();
+    }
+  });
+})();
+`;
+
 function runSketch() {
   const code = getEditorContents();
   const rightPanel = document.querySelector(".right-panel");
@@ -247,6 +317,7 @@ function runSketch() {
   }
 
   appendStatus("Running sketch...");
+  resetRecordingState();
 
   const existingFrame = rightPanel.querySelector("iframe");
   if (existingFrame) {
@@ -272,6 +343,7 @@ function runSketch() {
     window.onerror = function(msg, src, line) {
       window.parent.postMessage({ type: 'sketch-error', message: msg + ' (line ' + line + ')' }, '*');
     };
+    ${captureController}
     ${code}
   <\/script>
 </body>
@@ -279,13 +351,113 @@ function runSketch() {
 
   iframe.srcdoc = html;
   rightPanel.appendChild(iframe);
+  sketchFrame = iframe;
+}
+
+async function saveMedia(buffer, ext) {
+  const response = await fetch(`/api/save-media?ext=${encodeURIComponent(ext)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/octet-stream" },
+    body: buffer,
+  });
+
+  const result = await response.text();
+  if (!response.ok) {
+    throw new Error(result || "Save failed");
+  }
+
+  return result;
+}
+
+function setRecordingUI(active) {
+  isRecording = active;
+  if (!recordButton) {
+    return;
+  }
+
+  recordButton.classList.toggle("recording", active);
+  recordButton.setAttribute("aria-pressed", String(active));
+  const label = recordButton.querySelector(".rec-label");
+  if (label) {
+    label.textContent = active ? "Stop" : "Record";
+  }
+}
+
+function resetRecordingState() {
+  setRecordingUI(false);
+}
+
+function postToSketch(message) {
+  if (!sketchFrame || !sketchFrame.contentWindow) {
+    appendStatus("Run a sketch first");
+    return false;
+  }
+
+  sketchFrame.contentWindow.postMessage(message, "*");
+  return true;
+}
+
+function capturePng() {
+  if (postToSketch({ type: "capture-png" })) {
+    appendStatus("Capturing frame...");
+  }
+}
+
+function toggleRecording() {
+  if (isRecording) {
+    postToSketch({ type: "record-stop" });
+    return;
+  }
+
+  if (postToSketch({ type: "record-start", fps: 60 })) {
+    appendStatus("Starting recording...");
+  }
 }
 
 window.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "sketch-error") {
-    appendStatus(`Sketch error: ${event.data.message}`);
+  const data = event.data;
+  if (!data || typeof data.type !== "string") {
+    return;
+  }
+
+  switch (data.type) {
+    case "sketch-error":
+      appendStatus(`Sketch error: ${data.message}`);
+      break;
+    case "record-started":
+      setRecordingUI(true);
+      appendStatus("Recording...");
+      break;
+    case "record-error":
+      setRecordingUI(false);
+      appendStatus(`Recording error: ${data.message}`);
+      break;
+    case "capture-error":
+      appendStatus(`Capture error: ${data.message}`);
+      break;
+    case "recording-complete":
+      setRecordingUI(false);
+      saveMedia(data.buffer, data.ext || "webm")
+        .then((name) => appendStatus(`Saved recording to outputs/${name}`))
+        .catch((error) => appendStatus(`Save failed: ${error.message}`));
+      break;
+    case "capture-complete":
+      saveMedia(data.buffer, data.ext || "png")
+        .then((name) => appendStatus(`Saved frame to outputs/${name}`))
+        .catch((error) => appendStatus(`Save failed: ${error.message}`));
+      break;
+    default:
+      break;
   }
 });
+
+if (recordButton) {
+  recordButton.addEventListener("click", toggleRecording);
+}
+
+if (captureButton) {
+  captureButton.addEventListener("click", capturePng);
+}
 
 const runButton = document.getElementById("run-button");
 if (runButton) {

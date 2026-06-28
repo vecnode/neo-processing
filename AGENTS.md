@@ -32,6 +32,7 @@ runtime.
 │   WebKitGTK)                 │               │
 │                              ├─ GET  /health │
 │                              ├─ POST /api/save-script
+│                              ├─ POST /api/save-media
 │                              └─ static assets (embedded from public/)
 │                                              │
 │  boost::asio io_context (idle infra thread)  │
@@ -59,13 +60,17 @@ runtime.
 |------------------------|--------|-----------------|--------------------|--------|
 | `/health`              | GET    | —               | `200` `ok`         | —      |
 | `/api/save-script`     | POST   | sketch as text  | `200` `<filename>` | `400` empty, `413` too large, `500` write failure |
+| `/api/save-media?ext=` | POST   | binary (PNG/WebM) | `200` `<filename>` | `400` bad/empty ext or body, `413` too large, `500` write failure |
 | everything else        | GET    | —               | embedded static asset | `404` |
 
-Saved files are named `YYYY-MM-DD-HH-MM-SS_p5.js`. The filename is generated
-server-side from the clock — the client never supplies a path, so there is no
-path-traversal surface.
+Saved files are named server-side from the clock — scripts as
+`YYYY-MM-DD-HH-MM-SS_p5.js`, media as `YYYY-MM-DD-HH-MM-SS-mmm_<capture|recording>.<ext>`.
+The client never supplies a path, so there is no path-traversal surface. For
+`/api/save-media` the `ext` query param is sanitised to lower-case alphanumerics
+and checked against an allow-list (`png`, `jpg`, `jpeg`, `webm`, `mp4`); anything
+else is rejected.
 
-### The sketch runner (security-sensitive)
+### The sketch runner & capture (security-sensitive)
 
 `runSketch()` in `public/script.js` injects the user's code into an `<iframe>`
 via `srcdoc` with `sandbox="allow-scripts"` (intentionally **without**
@@ -79,6 +84,24 @@ via `srcdoc` with `sandbox="allow-scripts"` (intentionally **without**
 **Do not add `allow-same-origin` back** unless you have a deliberate reason and a
 replacement isolation strategy — it would let arbitrary user code escape the
 sandbox and reach the local server.
+
+Because the iframe is opaque-origin, **the parent cannot touch the sketch's
+canvas directly.** Recording and PNG capture therefore happen *inside* the
+iframe: a small `captureController` (also in `script.js`) is injected ahead of
+the user code and listens for `postMessage` commands from the parent.
+
+- **Record** (toggle button in the right side panel) → `canvas.captureStream(fps)`
+  + `MediaRecorder` produce a WebM blob (GPU-backed; no per-frame pixel copying
+  on the main thread). On stop, the bytes are transferred to the parent and
+  POSTed to `/api/save-media?ext=webm`.
+- **Capture PNG** → `canvas.toBlob('image/png')`, transferred to the parent and
+  POSTed to `/api/save-media?ext=png`.
+
+Both land in `outputs/`. The controller feature-detects `captureStream` /
+`MediaRecorder` and reports a `record-error` if the webview lacks them (WebKitGTK
+support varies by version). Known limitation: PNG capture of **WEBGL** sketches
+may be blank because p5 does not set `preserveDrawingBuffer` — video recording of
+WEBGL works regardless.
 
 ## Build & run
 
