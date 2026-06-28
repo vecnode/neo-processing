@@ -305,8 +305,8 @@ int main() {
   std::thread server_thread([&]() { server.listen_after_bind(); });
 
   webview::webview w(false, nullptr);
-  w.set_title("neo-processing");
-  w.set_size(900, 640, WEBVIEW_HINT_NONE);
+  w.set_title("neo-processing v0.1.0");
+  w.set_size(1280, 720, WEBVIEW_HINT_NONE);
 #ifdef _WIN32
   apply_windows_icons(w);
 #endif
