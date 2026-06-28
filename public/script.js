@@ -137,6 +137,7 @@ let isRecording = false;
 const recordButton = document.getElementById("record-button");
 const captureButton = document.getElementById("capture-button");
 const fullscreenButton = document.getElementById("fullscreen-button");
+const desktopFullscreenButton = document.getElementById("desktop-fullscreen-button");
 const librarySelect = document.getElementById("library-select");
 const libraryApplyButton = document.getElementById("library-apply");
 
@@ -641,9 +642,9 @@ function toggleRecording() {
   }
 }
 
-// Fullscreen the preview pane. The sketch iframe centres its canvas on a white
-// background, so in fullscreen the canvas sits at its exact size in the middle
-// of the screen. Esc (browser default) exits.
+// "Full Window": fill the WebView viewport (the app's content area) with the
+// preview pane via the Fullscreen API. The sketch iframe centres its canvas on a
+// white background. Esc (browser default) exits.
 function toggleFullscreen() {
   const rightPanel = document.querySelector(".right-panel");
   if (!rightPanel) {
@@ -665,9 +666,56 @@ function toggleFullscreen() {
     : Promise.reject(new Error("Fullscreen not supported"));
 
   Promise.resolve(request)
-    .then(() => appendStatus("Fullscreen — press Esc to exit"))
+    .then(() => appendStatus("Full window — press Esc to exit"))
     .catch((error) => appendStatus(`Fullscreen failed: ${error.message}`));
 }
+
+// "Fullscreen": the same preview-pane fullscreen, but also drive the native
+// window into borderless full-screen (window.neoSetDesktopFullscreen, bound in
+// C++) so the sketch covers the whole desktop, not just the app window. Esc
+// exits both — the browser leaves element fullscreen and the fullscreenchange
+// handler below restores the native window.
+let desktopFullscreenActive = false;
+
+function toggleDesktopFullscreen() {
+  const rightPanel = document.querySelector(".right-panel");
+  if (!rightPanel) {
+    return;
+  }
+
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+    return;
+  }
+
+  if (!sketchFrame) {
+    appendStatus("Run a sketch first");
+    return;
+  }
+
+  const request = rightPanel.requestFullscreen
+    ? rightPanel.requestFullscreen()
+    : Promise.reject(new Error("Fullscreen not supported"));
+
+  Promise.resolve(request)
+    .then(() => {
+      desktopFullscreenActive = true;
+      if (window.neoSetDesktopFullscreen) {
+        window.neoSetDesktopFullscreen(true);
+      }
+      appendStatus("Fullscreen — press Esc to exit");
+    })
+    .catch((error) => appendStatus(`Fullscreen failed: ${error.message}`));
+}
+
+document.addEventListener("fullscreenchange", () => {
+  if (!document.fullscreenElement && desktopFullscreenActive) {
+    desktopFullscreenActive = false;
+    if (window.neoSetDesktopFullscreen) {
+      window.neoSetDesktopFullscreen(false);
+    }
+  }
+});
 
 window.addEventListener("message", (event) => {
   const data = event.data;
@@ -716,6 +764,10 @@ if (captureButton) {
 
 if (fullscreenButton) {
   fullscreenButton.addEventListener("click", toggleFullscreen);
+}
+
+if (desktopFullscreenButton) {
+  desktopFullscreenButton.addEventListener("click", toggleDesktopFullscreen);
 }
 
 if (libraryApplyButton) {
