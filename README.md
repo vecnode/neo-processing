@@ -3,7 +3,7 @@
 > A native desktop editor and live runtime for [p5.js](https://p5js.org/)
 > sketches — a modern, JavaScript-based alternative to the Java Processing IDE.
 
-![neo-processing editor with a live sketch preview](./assets/img3.png)
+![neo-processing editor with a live sketch preview](./assets/img4.png)
 
 neo-processing ships as a **single self-contained executable**. It embeds a code
 editor and a live preview into a native desktop window, so you can write a p5.js
