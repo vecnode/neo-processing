@@ -10,7 +10,7 @@ editor and a live preview into a native desktop window, so you can write a p5.js
 sketch on the left and watch it run on the right, with the goal of real-world,
 full-screen deployment.
 
-> **Status:** active development. Interfaces and features may change.
+> **Status:** v0.1.0 — active development. Interfaces and features may change.
 
 ## Features
 
@@ -20,6 +20,10 @@ full-screen deployment.
   with a resizable split between source and preview.
 - **Live sketch preview** — run your sketch instantly in an isolated, sandboxed
   preview pane.
+- **Record & capture** — record the running canvas to WebM video or capture a
+  PNG frame, both rendered at the sketch's declared size and saved to `outputs/`.
+- **Fullscreen preview** — present the sketch centred at its exact size on a
+  white backdrop; press Esc to exit.
 - **Local-first & offline** — the frontend and p5.js are embedded into the
   binary and served from a loopback HTTP server; nothing is fetched at runtime.
 - **Save to disk** — export the current sketch to a timestamped `.js` file under

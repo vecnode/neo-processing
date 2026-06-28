@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>neo-processing</title>
+  <title>neo-processing v0.1.0</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -17,6 +17,7 @@
             <span class="rec-label">Record</span>
           </button>
           <button id="capture-button" class="panel-button" type="button">Capture PNG</button>
+          <button id="fullscreen-button" class="panel-button" type="button">Fullscreen</button>
         </div>
         <p class="panel-hint" id="capture-hint">Run a sketch, then record video or capture a frame. Files are saved to <code>outputs/</code>.</p>
       </div>
@@ -34,14 +35,6 @@
               <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Save file">Save</button></li>
             </ul>
           </div>
-          <div class="menu-group">
-            <button class="menu-button" type="button" aria-haspopup="true" aria-expanded="false" data-menu="edit-menu">Edit</button>
-            <ul class="menu-list" id="edit-menu" role="menu" hidden>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Undo edit">Undo</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Redo edit">Redo</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Paste content">Paste</button></li>
-            </ul>
-          </div>
         </nav>
         <button id="hamburger-button" class="hamburger-button" type="button" aria-controls="side-panel" aria-expanded="false" aria-label="Toggle sidebar">
           <span></span>
@@ -54,6 +47,7 @@
 
         <section class="middle-panel left-panel" aria-label="Main workspace">
           <div id="ace-editor" class="code-editor"></div>
+          <div class="editor-meta" id="editor-meta"></div>
         </section>
 
         <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" aria-label="Resize panels" tabindex="0"></div>

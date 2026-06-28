@@ -9,6 +9,12 @@ const statusContainer = document.querySelector(".bottom-row");
 const middleRow = document.getElementById("middle-row");
 const splitter = document.getElementById("splitter");
 const aceContainer = document.getElementById("ace-editor");
+const editorMeta = document.getElementById("editor-meta");
+
+// Version of the bundled p5.js library (public/libs/p5-<version>.min.js).
+// Single source of truth: drives both the version label and the <script>
+// the sketch iframe loads.
+const P5_VERSION = "1.11.3";
 
 const defaultSketch = `// Start your sketch
 function setup() {
@@ -18,7 +24,7 @@ function setup() {
 function draw() {
   background(20);
   noStroke();
-  fill(217, 119, 87);
+  fill(37, 99, 235);
   circle(width / 2, height / 2, 160);
 }`;
 
@@ -30,6 +36,7 @@ let isRecording = false;
 
 const recordButton = document.getElementById("record-button");
 const captureButton = document.getElementById("capture-button");
+const fullscreenButton = document.getElementById("fullscreen-button");
 
 function initializeEditor() {
   if (!aceContainer || typeof ace === "undefined") {
@@ -254,10 +261,21 @@ const captureController = `
 (function () {
   var recorder = null;
   var chunks = [];
+  var recording = false;
+  var rafId = 0;
   function canvas() { return document.querySelector('canvas'); }
   function send(type, extra, transfer) {
     var msg = Object.assign({ type: type }, extra || {});
     parent.postMessage(msg, '*', transfer || []);
+  }
+  // Logical sketch size (e.g. createCanvas(400, 400)), independent of the
+  // device pixel ratio that inflates the canvas backing store. Output media is
+  // rendered at this size so files match the dimensions the sketch declares.
+  function logicalSize(el) {
+    return {
+      w: Math.max(1, Math.round(el.clientWidth || el.width)),
+      h: Math.max(1, Math.round(el.clientHeight || el.height))
+    };
   }
   function pickMime() {
     var c = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
@@ -271,7 +289,11 @@ const captureController = `
     if (data.type === 'capture-png') {
       var el = canvas();
       if (!el) { send('capture-error', { message: 'No canvas in sketch' }); return; }
-      el.toBlob(function (blob) {
+      var s = logicalSize(el);
+      var off = document.createElement('canvas');
+      off.width = s.w; off.height = s.h;
+      off.getContext('2d').drawImage(el, 0, 0, s.w, s.h);
+      off.toBlob(function (blob) {
         if (!blob) { send('capture-error', { message: 'Snapshot failed' }); return; }
         blob.arrayBuffer().then(function (buf) {
           send('capture-complete', { buffer: buf, ext: 'png' }, [buf]);
@@ -280,20 +302,35 @@ const captureController = `
     } else if (data.type === 'record-start') {
       var el2 = canvas();
       if (!el2) { send('record-error', { message: 'No canvas in sketch' }); return; }
-      if (!el2.captureStream || !window.MediaRecorder) {
+      if (recorder && recorder.state !== 'inactive') return;
+      // Record from an offscreen canvas sized to the logical sketch, fed each
+      // frame from the live canvas — the WebM matches the declared dimensions.
+      var s2 = logicalSize(el2);
+      var rec = document.createElement('canvas');
+      rec.width = s2.w; rec.height = s2.h;
+      var ctx = rec.getContext('2d');
+      if (!rec.captureStream || !window.MediaRecorder) {
         send('record-error', { message: 'Recording not supported by this webview' });
         return;
       }
-      if (recorder && recorder.state !== 'inactive') return;
       var mime = pickMime();
       try {
-        var stream = el2.captureStream(data.fps || 60);
+        var stream = rec.captureStream(data.fps || 60);
         recorder = mime ? new MediaRecorder(stream, { mimeType: mime })
                         : new MediaRecorder(stream);
       } catch (err) { send('record-error', { message: String(err) }); return; }
       chunks = [];
+      recording = true;
+      (function pump() {
+        if (!recording) return;
+        var src = canvas();
+        if (src) ctx.drawImage(src, 0, 0, rec.width, rec.height);
+        rafId = requestAnimationFrame(pump);
+      })();
       recorder.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
       recorder.onstop = function () {
+        recording = false;
+        if (rafId) cancelAnimationFrame(rafId);
         var blob = new Blob(chunks, { type: (recorder && recorder.mimeType) || 'video/webm' });
         blob.arrayBuffer().then(function (buf) {
           send('recording-complete', { buffer: buf, ext: 'webm' }, [buf]);
@@ -302,6 +339,7 @@ const captureController = `
       recorder.start();
       send('record-started', {});
     } else if (data.type === 'record-stop') {
+      recording = false;
       if (recorder && recorder.state !== 'inactive') recorder.stop();
     }
   });
@@ -335,8 +373,18 @@ function runSketch() {
 <html>
 <head>
   <meta charset="UTF-8">
-  <style>body { margin: 0; overflow: hidden; }</style>
-  <script src="/libs/p5-1.11.3.min.js"><\/script>
+  <style>
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
+  <script src="/libs/p5-${P5_VERSION}.min.js"><\/script>
 </head>
 <body>
   <script>
@@ -414,6 +462,34 @@ function toggleRecording() {
   }
 }
 
+// Fullscreen the preview pane. The sketch iframe centres its canvas on a white
+// background, so in fullscreen the canvas sits at its exact size in the middle
+// of the screen. Esc (browser default) exits.
+function toggleFullscreen() {
+  const rightPanel = document.querySelector(".right-panel");
+  if (!rightPanel) {
+    return;
+  }
+
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+    return;
+  }
+
+  if (!sketchFrame) {
+    appendStatus("Run a sketch first");
+    return;
+  }
+
+  const request = rightPanel.requestFullscreen
+    ? rightPanel.requestFullscreen()
+    : Promise.reject(new Error("Fullscreen not supported"));
+
+  Promise.resolve(request)
+    .then(() => appendStatus("Fullscreen — press Esc to exit"))
+    .catch((error) => appendStatus(`Fullscreen failed: ${error.message}`));
+}
+
 window.addEventListener("message", (event) => {
   const data = event.data;
   if (!data || typeof data.type !== "string") {
@@ -459,6 +535,10 @@ if (captureButton) {
   captureButton.addEventListener("click", capturePng);
 }
 
+if (fullscreenButton) {
+  fullscreenButton.addEventListener("click", toggleFullscreen);
+}
+
 const runButton = document.getElementById("run-button");
 if (runButton) {
   runButton.addEventListener("click", (event) => {
@@ -500,6 +580,10 @@ if (splitter && middleRow) {
       splitter.releasePointerCapture(event.pointerId);
     }
   });
+}
+
+if (editorMeta) {
+  editorMeta.textContent = `p5.js v${P5_VERSION}`;
 }
 
 setLeftPanelSize(50);

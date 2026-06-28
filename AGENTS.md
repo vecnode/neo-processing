@@ -42,12 +42,16 @@ runtime.
 - **`src/main.cpp`** — the entire C++ application. Entry point, HTTP routes,
   window creation, per-OS icon handling, and graceful shutdown.
 - **`public/`** — the frontend, embedded into the binary via `cpp-embedlib`:
-  - `index.html` — layout: menu bar, Ace editor (left), sketch preview (right),
-    status/terminal row (bottom), collapsible side panel.
+  - `index.html` — layout: menu bar, Ace editor + p5 version label (left), sketch
+    preview (right), status/terminal row (bottom), collapsible side panel with
+    Record / Capture PNG / Fullscreen controls.
   - `script.js` — all UI logic: editor setup, menus, file open/save, panel
-    splitter, and the sketch runner.
+    splitter, the sketch runner, and the capture/fullscreen controls.
   - `style.css` — styling.
   - `libs/` — vendored third-party JS (Ace editor, p5.js). These are committed.
+    The bundled p5 version is declared once as `P5_VERSION` in `script.js`, which
+    drives both the version label and the `<script>` URL the sketch iframe loads;
+    keep it in sync with the `public/libs/p5-<version>.min.js` filename.
 - **`outputs/`** — where saved sketches are written at runtime
   (`POST /api/save-script`). Treated as scratch output; safe to clear.
 - **`icons/`** — `.ico` files copied next to the executable on Windows and loaded
@@ -90,18 +94,30 @@ canvas directly.** Recording and PNG capture therefore happen *inside* the
 iframe: a small `captureController` (also in `script.js`) is injected ahead of
 the user code and listens for `postMessage` commands from the parent.
 
-- **Record** (toggle button in the right side panel) → `canvas.captureStream(fps)`
-  + `MediaRecorder` produce a WebM blob (GPU-backed; no per-frame pixel copying
-  on the main thread). On stop, the bytes are transferred to the parent and
-  POSTed to `/api/save-media?ext=webm`.
-- **Capture PNG** → `canvas.toBlob('image/png')`, transferred to the parent and
+Output media is rendered at the sketch's **logical** size (`canvas.clientWidth/
+Height`, e.g. `400×400`), not the device-pixel-inflated backing store, so files
+match the dimensions the sketch declares.
+
+- **Record** (toggle button in the right side panel) → an offscreen canvas at the
+  logical size is fed each frame from the live canvas (`drawImage`), and
+  `offscreen.captureStream(fps)` + `MediaRecorder` produce a WebM blob (GPU-backed;
+  no per-frame pixel copying to JS). On stop, the bytes are transferred to the
+  parent and POSTed to `/api/save-media?ext=webm`.
+- **Capture PNG** → the live canvas is drawn once onto a logical-size offscreen
+  canvas and exported with `toBlob('image/png')`, transferred to the parent and
   POSTed to `/api/save-media?ext=png`.
 
 Both land in `outputs/`. The controller feature-detects `captureStream` /
 `MediaRecorder` and reports a `record-error` if the webview lacks them (WebKitGTK
-support varies by version). Known limitation: PNG capture of **WEBGL** sketches
-may be blank because p5 does not set `preserveDrawingBuffer` — video recording of
-WEBGL works regardless.
+support varies by version). Known limitation: capture of **WEBGL** sketches may
+be blank because p5 does not set `preserveDrawingBuffer` (this affects both the
+PNG snapshot and the per-frame `drawImage` used for recording).
+
+**Fullscreen** (side-panel button) calls `requestFullscreen()` on the preview
+pane (`.right-panel`), not the sandboxed iframe — so it needs no iframe
+fullscreen permission. The sketch iframe's body centres its canvas on a white
+background, so fullscreen shows the canvas at its exact pixel size in the middle
+of the screen. Esc exits via the browser default.
 
 ## Build & run
 
