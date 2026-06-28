@@ -255,7 +255,10 @@ function runSketch() {
 
   const iframe = document.createElement("iframe");
   iframe.style.cssText = "width:100%;height:100%;border:none;background:#fff;";
-  iframe.sandbox = "allow-scripts allow-same-origin";
+  // Run user sketches in an opaque origin: scripts are permitted, but the
+  // sketch cannot reach the parent document, cookies, storage, or the local
+  // HTTP API. (allow-same-origin is deliberately omitted.)
+  iframe.sandbox = "allow-scripts";
 
   const html = `<!DOCTYPE html>
 <html>
