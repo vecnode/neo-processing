@@ -70,9 +70,14 @@ that weaken them should be treated as security-relevant:
   it is not reachable from other hosts.
 - **Sandboxed sketches.** User sketches run inside an `<iframe>` with
   `sandbox="allow-scripts"` and **no** `allow-same-origin`, giving them an opaque
-  origin. They cannot read cookies/storage, reach the parent document, or call
-  the local HTTP API. Recording/screenshot capture happens inside that sandbox
-  and only finished bytes cross the boundary via `postMessage`.
+  origin. They cannot read cookies/storage or reach the parent document.
+  Recording/screenshot capture happens inside that sandbox and only finished
+  bytes cross the boundary via `postMessage`.
+- **Origin-checked write endpoints.** The write APIs (`/api/save-script`,
+  `/api/save-media`) reject requests whose `Origin` is not the app's own page
+  origin. The editor UI's POSTs carry that origin; a sketch's opaque-origin
+  requests carry `Origin: null` and are denied — so sketch code cannot drive the
+  server even via a fire-and-forget request whose response it can't read.
 - **Constrained server endpoints.** Request bodies are size-capped and requests
   are time-bounded. Saved files use server-generated names; the only
   client-supplied value (a media file extension) is sanitised to lower-case
@@ -97,7 +102,14 @@ Because neo-processing executes user-provided JavaScript inside a WebView:
 - Keep the JS↔C++ surface minimal; validate and bound everything that crosses it.
 - Do not expose direct file system, network, or process-control APIs to sketch
   code.
-- Preserve the sandbox (`allow-scripts` only) and the loopback bind address.
+- **Treat every `webview.bind` callback as reachable by untrusted sketch code.**
+  The WebView host injects bindings into child frames too, so only bind functions
+  that are safe to invoke from a sketch (the existing `neoSetDesktopFullscreen`
+  only toggles the window, which the user can reverse with Esc). Never bind a
+  function that touches the file system, spawns processes, or returns sensitive
+  data without an independent authorization check.
+- Preserve the sandbox (`allow-scripts` only), the loopback bind address, and the
+  `Origin` check on the write endpoints.
 - Keep dependencies — including the WebView runtime and fetched libraries —
   reasonably current.
 

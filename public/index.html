@@ -39,6 +39,7 @@
       <header class="top-row">
         <nav class="menu-bar" aria-label="Application menu">
           <button id="run-button" class="menu-button run-button" type="button" aria-label="Run sketch">&gt;</button>
+          <button id="stop-button" class="menu-button stop-button" type="button" aria-label="Stop sketch">&#9632;</button>
           <div class="menu-group">
             <button class="menu-button" type="button" aria-haspopup="true" aria-expanded="false" data-menu="file-menu">File</button>
             <ul class="menu-list" id="file-menu" role="menu" hidden>
@@ -79,6 +80,8 @@
         </section>
 
       </main>
+
+      <div class="h-splitter" id="h-splitter" role="separator" aria-orientation="horizontal" aria-label="Resize terminal" tabindex="0"></div>
 
       <footer class="bottom-row">
         <span class="status-label">>_</span>

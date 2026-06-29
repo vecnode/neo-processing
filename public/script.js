@@ -774,10 +774,34 @@ if (libraryApplyButton) {
   libraryApplyButton.addEventListener("click", applyLibrary);
 }
 
+// Stop the running sketch: remove its iframe so it stops executing and
+// rendering entirely, and reset any capture state tied to it.
+function stopSketch() {
+  const rightPanel = document.querySelector(".right-panel");
+  const frame = rightPanel && rightPanel.querySelector("iframe");
+  if (!frame) {
+    appendStatus("No sketch running");
+    return;
+  }
+
+  frame.remove();
+  sketchFrame = null;
+  resetRecordingState();
+  appendStatus("Sketch stopped");
+}
+
 const runButton = document.getElementById("run-button");
 if (runButton) {
   runButton.addEventListener("click", (event) => {
     runSketch();
+    event.stopPropagation();
+  });
+}
+
+const stopButton = document.getElementById("stop-button");
+if (stopButton) {
+  stopButton.addEventListener("click", (event) => {
+    stopSketch();
     event.stopPropagation();
   });
 }
@@ -815,6 +839,60 @@ if (splitter && middleRow) {
       splitter.releasePointerCapture(event.pointerId);
     }
   });
+}
+
+const hSplitter = document.getElementById("h-splitter");
+const mainLayout = document.querySelector(".main-layout");
+let isResizingBottom = false;
+
+function setBottomPanelSize(px) {
+  if (!mainLayout) {
+    return;
+  }
+
+  const rect = mainLayout.getBoundingClientRect();
+  const max = rect.height * 0.8;
+  const clamped = Math.min(max, Math.max(48, px));
+  mainLayout.style.setProperty("--bottom-panel-size", `${clamped}px`);
+  if (aceEditor) {
+    aceEditor.resize();
+  }
+}
+
+function updateBottomFromPointer(clientY) {
+  if (!mainLayout) {
+    return;
+  }
+
+  const rect = mainLayout.getBoundingClientRect();
+  setBottomPanelSize(rect.bottom - clientY);
+}
+
+if (hSplitter && mainLayout) {
+  hSplitter.addEventListener("pointerdown", (event) => {
+    isResizingBottom = true;
+    hSplitter.setPointerCapture(event.pointerId);
+    updateBottomFromPointer(event.clientY);
+    event.preventDefault();
+  });
+
+  hSplitter.addEventListener("pointermove", (event) => {
+    if (!isResizingBottom) {
+      return;
+    }
+
+    updateBottomFromPointer(event.clientY);
+  });
+
+  const endBottomResize = (event) => {
+    isResizingBottom = false;
+    if (hSplitter.hasPointerCapture(event.pointerId)) {
+      hSplitter.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  hSplitter.addEventListener("pointerup", endBottomResize);
+  hSplitter.addEventListener("pointercancel", endBottomResize);
 }
 
 setLibraryLabel();
