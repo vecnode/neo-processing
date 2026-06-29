@@ -98,8 +98,9 @@ Use `--config Debug` (and the `Debug` output folder) for a debug build.
 ./build_and_run.sh
 ```
 
-> `build_and_distribute.bat` is a placeholder for the future Release packaging
-> pipeline and is not yet implemented.
+To produce a distributable build, run `.\build_and_distribute.bat` (Windows): it
+builds Release and copies the `build\Release` folder (executable, icons, and any
+runtime DLLs) to `%USERPROFILE%\Desktop\neo-processing`.
 
 ## Dependencies
 

@@ -180,7 +180,7 @@ body {
   height: 100%;
   min-width: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) minmax(0, 30%);
+  grid-template-rows: auto minmax(0, 1fr) 6px var(--bottom-panel-size, 200px);
   transition: width 0.2s ease;
 }
 
@@ -296,6 +296,24 @@ body {
   outline: none;
 }
 
+/* Horizontal splitter between the preview area and the terminal — drag to
+   resize the terminal height, mirroring the vertical .splitter. */
+.h-splitter {
+  background:
+    linear-gradient(to bottom, transparent 0, transparent 2px, var(--border-strong) 2px, var(--border-strong) 4px, transparent 4px, transparent 100%);
+  cursor: row-resize;
+  touch-action: none;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.h-splitter:hover,
+.h-splitter:focus-visible {
+  background:
+    linear-gradient(to bottom, transparent 0, transparent 2px, var(--accent) 2px, var(--accent) 4px, transparent 4px, transparent 100%);
+  outline: none;
+}
+
 .top-row {
   border-bottom: 1px solid var(--border);
   background: var(--surface);
@@ -347,19 +365,21 @@ body {
   border-color: var(--border-strong);
 }
 
-/* Run button — primary action, clay accent. */
-.run-button {
-  background: var(--accent);
-  color: #ffffff;
-  border-color: var(--accent);
+/* Run / Stop — primary transport controls, neutral grey. */
+.run-button,
+.stop-button {
+  background: #d7d4c8;
+  color: var(--text);
+  border-color: var(--border-strong);
   font-weight: 700;
   min-width: 34px;
   text-align: center;
 }
 
-.run-button:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
+.run-button:hover,
+.stop-button:hover {
+  background: #c9c6ba;
+  border-color: var(--muted);
 }
 
 .menu-list {

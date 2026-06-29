@@ -42,10 +42,13 @@ runtime.
 - **`src/main.cpp`** — the entire C++ application. Entry point, HTTP routes,
   window creation, per-OS icon handling, and graceful shutdown.
 - **`public/`** — the frontend, embedded into the binary via `cpp-embedlib`:
-  - `index.html` — layout: menu bar (Run, File, Examples), Ace editor + p5
-    version label (left), sketch preview (right), status/terminal row (bottom),
-    collapsible side panel with a Capture section (Record / Capture PNG /
-    Full Window / Fullscreen) and a Libraries section (p5.js build picker).
+  - `index.html` — layout: menu bar (Run, Stop, File, Examples), Ace editor + p5
+    version label (left), sketch preview (right), a draggable horizontal splitter,
+    a resizable status/terminal row (bottom), and a collapsible side panel with a
+    Capture section (Record / Capture PNG / Full Window / Fullscreen) and a
+    Libraries section (p5.js build picker). Stop tears down the sketch iframe; the
+    `.splitter` resizes the editor/preview split and `.h-splitter` the terminal
+    height (both drive CSS custom properties on the grid).
   - `libraries.json` — manifest of injectable p5.js builds (`{ id, name,
     version, url, isLocal }`); see the Libraries section below.
   - `script.js` — all UI logic: editor setup, menus, file open/save, panel
@@ -66,9 +69,14 @@ runtime.
 | Route                  | Method | Body            | Success            | Errors |
 |------------------------|--------|-----------------|--------------------|--------|
 | `/health`              | GET    | —               | `200` `ok`         | —      |
-| `/api/save-script`     | POST   | sketch as text  | `200` `<filename>` | `400` empty, `413` too large, `500` write failure |
-| `/api/save-media?ext=` | POST   | binary (PNG/WebM) | `200` `<filename>` | `400` bad/empty ext or body, `413` too large, `500` write failure |
+| `/api/save-script`     | POST   | sketch as text  | `200` `<filename>` | `403` bad origin, `400` empty, `413` too large, `500` write failure |
+| `/api/save-media?ext=` | POST   | binary (PNG/WebM) | `200` `<filename>` | `403` bad origin, `400` bad/empty ext or body, `413` too large, `500` write failure |
 | everything else        | GET    | —               | embedded static asset | `404` |
+
+Both write endpoints reject requests whose `Origin` header isn't the app's own
+page origin (`http://127.0.0.1:<port>`). The editor UI's POSTs carry that origin;
+a sketch's opaque-origin iframe sends `Origin: null` and is denied, so sketch
+code cannot reach these endpoints even via a fire-and-forget request.
 
 Saved files are named server-side from the clock — scripts as
 `YYYY-MM-DD-HH-MM-SS_p5.js`, media as `YYYY-MM-DD-HH-MM-SS-mmm_<capture|recording>.<ext>`.
@@ -170,7 +178,9 @@ cmake --build build --target neo-processing -j --config Debug
 #   Linux:   ./build_and_run.sh
 ```
 
-`build_and_distribute.bat` is an unimplemented placeholder for Release packaging.
+`build_and_distribute.bat` (Windows) builds Release and copies the resulting
+`build\Release` folder (executable, icons, runtime DLLs) to
+`%USERPROFILE%\Desktop\neo-processing`.
 
 ### Dependencies (fetched at configure time into `build/_deps/`)
 

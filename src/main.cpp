@@ -261,6 +261,20 @@ std::filesystem::path save_media_to_outputs(const std::string &contents,
   return path;
 }
 
+// Rejects state-changing requests that don't originate from the app's own page.
+// The editor UI runs at `expected_origin` (http://127.0.0.1:<port>) and its POSTs
+// carry that Origin header. A sketch runs in a sandboxed, opaque-origin iframe,
+// so its requests carry `Origin: null` (or a foreign origin) — those are denied,
+// closing the one channel by which user sketch code could reach these endpoints.
+bool origin_is_trusted(const httplib::Request &req,
+                       const std::string &expected_origin) {
+  auto it = req.headers.find("Origin");
+  if (it == req.headers.end()) {
+    return true; // same-origin GETs may omit Origin; the write paths are POSTs
+  }
+  return it->second == expected_origin;
+}
+
 int main() {
   // Boost.Asio io_context — reserved as the foundation for future async work
   // (timers, networking, background jobs). The work guard keeps it alive even
@@ -272,6 +286,10 @@ int main() {
   std::thread asio_thread([&ioc]() { ioc.run(); });
 
   httplib::Server server;
+
+  // The app's own page origin, filled in once the server is bound to a port.
+  // Used to reject write requests that don't come from the editor UI.
+  std::string expected_origin;
 
   // Cap request bodies at the transport layer and bound how long a single
   // request may hold a worker, so a slow or oversized client cannot stall the
@@ -285,7 +303,13 @@ int main() {
     res.set_content("ok", "text/plain; charset=utf-8");
   });
 
-  server.Post("/api/save-script", [](const httplib::Request &req, httplib::Response &res) {
+  server.Post("/api/save-script", [&expected_origin](const httplib::Request &req, httplib::Response &res) {
+    if (!origin_is_trusted(req, expected_origin)) {
+      res.status = 403;
+      res.set_content("Forbidden", "text/plain; charset=utf-8");
+      return;
+    }
+
     if (req.body.empty()) {
       res.status = 400;
       res.set_content("Editor is empty", "text/plain; charset=utf-8");
@@ -312,7 +336,13 @@ int main() {
   // body is written verbatim; the filename is generated server-side and the
   // extension is validated against an allow-list, so the client never controls
   // a path on disk.
-  server.Post("/api/save-media", [](const httplib::Request &req, httplib::Response &res) {
+  server.Post("/api/save-media", [&expected_origin](const httplib::Request &req, httplib::Response &res) {
+    if (!origin_is_trusted(req, expected_origin)) {
+      res.status = 403;
+      res.set_content("Forbidden", "text/plain; charset=utf-8");
+      return;
+    }
+
     const auto ext = sanitize_extension(req.get_param_value("ext"));
     if (!is_allowed_media_extension(ext)) {
       res.status = 400;
@@ -356,6 +386,11 @@ int main() {
     asio_thread.join();
     return 1;
   }
+
+  // Now that the port is known, record the page origin the write endpoints
+  // accept. Handlers captured `expected_origin` by reference, and requests are
+  // only served after this point (listen starts below).
+  expected_origin = "http://127.0.0.1:" + std::to_string(port);
 
   std::thread server_thread([&]() { server.listen_after_bind(); });
 
