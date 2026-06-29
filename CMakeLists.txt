@@ -97,6 +97,17 @@ if(APPLE)
 endif()
 
 if(WIN32)
+    # Build as a GUI app (Windows subsystem) so no console window pops up when
+    # the executable is launched. Keep the standard int main() entry point by
+    # pointing the linker at the CRT's main startup (MSVC); MinGW's -mwindows
+    # (added by WIN32_EXECUTABLE) already wraps main().
+    set_target_properties(neo-processing PROPERTIES WIN32_EXECUTABLE TRUE)
+    if(MSVC)
+        target_link_options(neo-processing PRIVATE /ENTRY:mainCRTStartup)
+    endif()
+endif()
+
+if(WIN32)
     add_custom_command(TARGET neo-processing POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory
             $<TARGET_FILE_DIR:neo-processing>/../bin/$<CONFIG>

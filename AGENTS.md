@@ -45,7 +45,8 @@ runtime.
   - `index.html` — layout: menu bar (Run, Stop, File, Examples), Ace editor + p5
     version label (left), sketch preview (right), a draggable horizontal splitter,
     a resizable status/terminal row (bottom), and a collapsible side panel with a
-    Capture section (Record / Capture PNG / Full Window / Fullscreen) and a
+    Capture section (Record / Capture PNG / Full Window / Fullscreen), a Sketch
+    section (background-colour picker for the area behind the canvas), and a
     Libraries section (p5.js build picker). Stop tears down the sketch iframe; the
     `.splitter` resizes the editor/preview split and `.h-splitter` the terminal
     height (both drive CSS custom properties on the grid).
@@ -214,6 +215,11 @@ downloaded into the build tree.
   (or just use `build_and_run.bat`).
 - **Per-OS code** in `main.cpp` is guarded with `#ifdef _WIN32` / `#ifdef
   __linux__`. macOS is partially wired in CMake (frameworks) but not exercised.
+- **No console window.** On Windows the target is built as a GUI app
+  (`WIN32_EXECUTABLE`, with `/ENTRY:mainCRTStartup` so `int main()` stays the
+  entry point), so launching the `.exe` opens no terminal. `std::cerr`/`std::cout`
+  logging therefore isn't visible from a console — attach a debugger if you need
+  it during development.
 - **Platform.** Primary development is on Windows (PowerShell). The Bash tool is
   available for POSIX scripts.
 
