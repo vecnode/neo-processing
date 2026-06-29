@@ -16,6 +16,7 @@
   --shadow: 0 1px 2px rgba(40, 38, 32, 0.04), 0 6px 16px rgba(40, 38, 32, 0.06);
   --radius: 8px;
   --radius-sm: 6px;
+  --sketch-bg: #ffffff;
 }
 
 * {
@@ -162,6 +163,35 @@ body {
   50% { opacity: 0.35; }
 }
 
+.sketch-bg-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.sketch-bg-label {
+  font-size: 0.875rem;
+  color: var(--text);
+}
+
+#sketch-bg-color {
+  width: 52px;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  cursor: pointer;
+}
+
+#sketch-bg-color:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 .panel-hint {
   margin-top: 14px;
   font-size: 0.78rem;
@@ -248,7 +278,7 @@ body {
    its own canvas, so it sits at exact size in the middle of the screen. */
 .right-panel:fullscreen {
   padding: 0;
-  background: #ffffff;
+  background: var(--sketch-bg, #ffffff);
 }
 
 .right-panel:fullscreen iframe {

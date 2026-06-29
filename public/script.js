@@ -140,6 +140,11 @@ const fullscreenButton = document.getElementById("fullscreen-button");
 const desktopFullscreenButton = document.getElementById("desktop-fullscreen-button");
 const librarySelect = document.getElementById("library-select");
 const libraryApplyButton = document.getElementById("library-apply");
+const sketchBgColor = document.getElementById("sketch-bg-color");
+
+// Background colour shown behind the sketch canvas (default white). Baked into
+// the iframe when a sketch runs and pushed live via postMessage when changed.
+let sketchBg = "#ffffff";
 
 function initializeEditor() {
   if (!aceContainer || typeof ace === "undefined") {
@@ -521,6 +526,8 @@ const captureController = `
     } else if (data.type === 'record-stop') {
       recording = false;
       if (recorder && recorder.state !== 'inactive') recorder.stop();
+    } else if (data.type === 'set-bg') {
+      document.body.style.background = data.color;
     }
   });
 })();
@@ -543,7 +550,7 @@ function runSketch() {
   }
 
   const iframe = document.createElement("iframe");
-  iframe.style.cssText = "width:100%;height:100%;border:none;background:#fff;";
+  iframe.style.cssText = `width:100%;height:100%;border:none;background:${sketchBg};`;
   // Run user sketches in an opaque origin: scripts are permitted, but the
   // sketch cannot reach the parent document, cookies, storage, or the local
   // HTTP API. (allow-same-origin is deliberately omitted.)
@@ -558,7 +565,7 @@ function runSketch() {
     body {
       margin: 0;
       overflow: hidden;
-      background: #fff;
+      background: ${sketchBg};
       display: flex;
       align-items: center;
       justify-content: center;
@@ -772,6 +779,24 @@ if (desktopFullscreenButton) {
 
 if (libraryApplyButton) {
   libraryApplyButton.addEventListener("click", applyLibrary);
+}
+
+// Applies the chosen sketch background: stores it (baked into the next run),
+// updates the fullscreen letterbox colour, and pushes it live to a running
+// sketch so the change shows immediately.
+function applySketchBg(color) {
+  sketchBg = color;
+  document.documentElement.style.setProperty("--sketch-bg", color);
+  if (sketchFrame && sketchFrame.contentWindow) {
+    sketchFrame.contentWindow.postMessage({ type: "set-bg", color }, "*");
+  }
+}
+
+if (sketchBgColor) {
+  applySketchBg(sketchBgColor.value || "#ffffff");
+  sketchBgColor.addEventListener("input", (event) => {
+    applySketchBg(event.target.value);
+  });
 }
 
 // Stop the running sketch: remove its iframe so it stops executing and
