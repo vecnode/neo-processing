@@ -176,6 +176,36 @@ body {
   color: var(--text);
 }
 
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.segmented-btn {
+  border: none;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.segmented-btn + .segmented-btn {
+  border-left: 1px solid var(--border-strong);
+}
+
+.segmented-btn:hover {
+  background: var(--accent-soft);
+}
+
+.segmented-btn.is-active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
 #sketch-bg-color {
   width: 52px;
   height: 32px;
