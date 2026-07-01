@@ -46,8 +46,9 @@ runtime.
     version label (left), sketch preview (right), a draggable horizontal splitter,
     a resizable status/terminal row (bottom), and a collapsible side panel with a
     Capture section (Record / Capture PNG / Full Window / Fullscreen), a Sketch
-    section (background-colour picker for the area behind the canvas), and a
-    Libraries section (p5.js build picker). Stop tears down the sketch iframe; the
+    section (canvas anchor toggle — Center/Top Left — and a background-colour
+    picker for the area behind the canvas), and a Libraries section (p5.js build
+    picker). Stop tears down the sketch iframe; the
     `.splitter` resizes the editor/preview split and `.h-splitter` the terminal
     height (both drive CSS custom properties on the grid).
   - `libraries.json` — manifest of injectable p5.js builds (`{ id, name,

@@ -146,6 +146,10 @@ const sketchBgColor = document.getElementById("sketch-bg-color");
 // the iframe when a sketch runs and pushed live via postMessage when changed.
 let sketchBg = "#ffffff";
 
+// Where the canvas sits within the preview: "center" (default) or "topleft".
+let sketchAnchor = "center";
+const anchorButtons = document.querySelectorAll(".segmented-btn[data-anchor]");
+
 function initializeEditor() {
   if (!aceContainer || typeof ace === "undefined") {
     return;
@@ -528,6 +532,10 @@ const captureController = `
       if (recorder && recorder.state !== 'inactive') recorder.stop();
     } else if (data.type === 'set-bg') {
       document.body.style.background = data.color;
+    } else if (data.type === 'set-anchor') {
+      var a = data.anchor === 'center' ? 'center' : 'flex-start';
+      document.body.style.alignItems = a;
+      document.body.style.justifyContent = a;
     }
   });
 })();
@@ -567,8 +575,8 @@ function runSketch() {
       overflow: hidden;
       background: ${sketchBg};
       display: flex;
-      align-items: center;
-      justify-content: center;
+      align-items: ${sketchAnchor === "center" ? "center" : "flex-start"};
+      justify-content: ${sketchAnchor === "center" ? "center" : "flex-start"};
     }
   </style>
   <script src="${activeLibrary.url}"><\/script>
@@ -798,6 +806,26 @@ if (sketchBgColor) {
     applySketchBg(event.target.value);
   });
 }
+
+// Anchor switch: stores the choice (baked into the next run) and pushes it live
+// to a running sketch so the canvas repositions immediately.
+function applySketchAnchor(anchor) {
+  sketchAnchor = anchor;
+  if (sketchFrame && sketchFrame.contentWindow) {
+    sketchFrame.contentWindow.postMessage({ type: "set-anchor", anchor }, "*");
+  }
+}
+
+anchorButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    anchorButtons.forEach((other) => {
+      const isActive = other === button;
+      other.classList.toggle("is-active", isActive);
+      other.setAttribute("aria-pressed", String(isActive));
+    });
+    applySketchAnchor(button.dataset.anchor);
+  });
+});
 
 // Stop the running sketch: remove its iframe so it stops executing and
 // rendering entirely, and reset any capture state tied to it.
