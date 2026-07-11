@@ -41,9 +41,12 @@ function draw() {
   circle(width / 2, height / 2, 160);
 }`;
 
-// Built-in example sketches, keyed by their Examples-menu label.
+// Built-in example sketches, keyed by their Examples-menu label. Organised
+// into five topics of five sketches each (see public/index.html's
+// #examples-menu, which groups them the same way).
 const examples = {
-  "Bouncing ball": `// Bouncing ball
+  // --- Motion & Physics ---------------------------------------------------
+  "Bouncing Ball": `// Bouncing Ball
 let x, y, vx, vy, r;
 
 function setup() {
@@ -65,38 +68,7 @@ function draw() {
   fill(37, 99, 235);
   circle(x, y, r * 2);
 }`,
-  "Sine wave": `// Sine wave
-function setup() {
-  createCanvas(400, 400);
-}
-
-function draw() {
-  background(20);
-  noFill();
-  stroke(37, 99, 235);
-  strokeWeight(3);
-  beginShape();
-  for (let px = 0; px <= width; px += 8) {
-    let py = height / 2 + sin(px * 0.03 + frameCount * 0.05) * 90;
-    vertex(px, py);
-  }
-  endShape();
-}`,
-  "Spinning square": `// Spinning square
-function setup() {
-  createCanvas(400, 400);
-  rectMode(CENTER);
-}
-
-function draw() {
-  background(20);
-  translate(width / 2, height / 2);
-  rotate(frameCount * 0.02);
-  noStroke();
-  fill(37, 99, 235);
-  rect(0, 0, 150, 150);
-}`,
-  "Random walker": `// Random walker
+  "Random Walker": `// Random Walker
 let x, y;
 
 function setup() {
@@ -113,7 +85,259 @@ function draw() {
   x = constrain(x + random(-4, 4), 0, width);
   y = constrain(y + random(-4, 4), 0, height);
 }`,
-  "Particle swarm": `// Particle swarm
+  "Spring Follow": `// Spring Follow
+let x, y, tx, ty;
+
+function setup() {
+  createCanvas(400, 400);
+  x = tx = width / 2;
+  y = ty = height / 2;
+}
+
+function draw() {
+  background(20);
+  tx = width / 2 + cos(frameCount * 0.02) * 140;
+  ty = height / 2 + sin(frameCount * 0.03) * 140;
+  x += (tx - x) * 0.08;
+  y += (ty - y) * 0.08;
+  noStroke();
+  fill(37, 99, 235);
+  circle(x, y, 30);
+}`,
+  "Gravity Bounce": `// Gravity Bounce
+let x, y, vy, r;
+
+function setup() {
+  createCanvas(400, 400);
+  x = width / 2;
+  y = 40;
+  vy = 0;
+  r = 30;
+}
+
+function draw() {
+  background(20);
+  vy += 0.5;
+  y += vy;
+  if (y > height - r) {
+    y = height - r;
+    vy *= -0.75;
+  }
+  noStroke();
+  fill(37, 99, 235);
+  circle(x, y, r * 2);
+}`,
+  "Orbiting Body": `// Orbiting Body
+let angle = 0;
+
+function setup() {
+  createCanvas(400, 400);
+}
+
+function draw() {
+  background(20);
+  translate(width / 2, height / 2);
+  angle += 0.03;
+  let x = cos(angle) * 140;
+  let y = sin(angle) * 140;
+  stroke(80);
+  line(0, 0, x, y);
+  noStroke();
+  fill(37, 99, 235);
+  circle(0, 0, 24);
+  fill(234, 88, 12);
+  circle(x, y, 16);
+}`,
+
+  // --- Shapes & Geometry ---------------------------------------------------
+  "Spinning Square": `// Spinning Square
+function setup() {
+  createCanvas(400, 400);
+  rectMode(CENTER);
+}
+
+function draw() {
+  background(20);
+  translate(width / 2, height / 2);
+  rotate(frameCount * 0.02);
+  noStroke();
+  fill(37, 99, 235);
+  rect(0, 0, 150, 150);
+}`,
+  "Grid of Circles": `// Grid of Circles
+function setup() {
+  createCanvas(400, 400);
+  noStroke();
+}
+
+function draw() {
+  background(20);
+  fill(37, 99, 235);
+  let step = 40;
+  for (let x = step / 2; x < width; x += step) {
+    for (let y = step / 2; y < height; y += step) {
+      let d = 10 + 8 * sin(frameCount * 0.05 + x * 0.05 + y * 0.05);
+      circle(x, y, d);
+    }
+  }
+}`,
+  "Polygon Pulse": `// Polygon Pulse
+function setup() {
+  createCanvas(400, 400);
+  noFill();
+  stroke(37, 99, 235);
+  strokeWeight(2);
+}
+
+function draw() {
+  background(20);
+  translate(width / 2, height / 2);
+  rotate(frameCount * 0.01);
+  let sides = 6;
+  let r = 100 + 30 * sin(frameCount * 0.04);
+  beginShape();
+  for (let i = 0; i < sides; i++) {
+    let a = (TWO_PI * i) / sides;
+    vertex(cos(a) * r, sin(a) * r);
+  }
+  endShape(CLOSE);
+}`,
+  "Concentric Rings": `// Concentric Rings
+function setup() {
+  createCanvas(400, 400);
+  noFill();
+  strokeWeight(2);
+}
+
+function draw() {
+  background(20);
+  translate(width / 2, height / 2);
+  let offset = (frameCount * 1.5) % 20;
+  for (let r = 10; r < 220; r += 20) {
+    stroke(37, 99, 235, constrain(200 - r, 20, 200));
+    circle(0, 0, r + offset);
+  }
+}`,
+  "Star Field": `// Star Field
+let stars = [];
+
+function setup() {
+  createCanvas(400, 400);
+  for (let i = 0; i < 200; i++) {
+    stars.push({ x: random(width), y: random(height), z: random(1, 4) });
+  }
+  noStroke();
+}
+
+function draw() {
+  background(10);
+  fill(255);
+  for (const s of stars) {
+    s.x -= s.z;
+    if (s.x < 0) s.x = width;
+    circle(s.x, s.y, s.z);
+  }
+}`,
+
+  // --- Waves & Noise -------------------------------------------------------
+  "Sine Wave": `// Sine Wave
+function setup() {
+  createCanvas(400, 400);
+}
+
+function draw() {
+  background(20);
+  noFill();
+  stroke(37, 99, 235);
+  strokeWeight(3);
+  beginShape();
+  for (let px = 0; px <= width; px += 8) {
+    let py = height / 2 + sin(px * 0.03 + frameCount * 0.05) * 90;
+    vertex(px, py);
+  }
+  endShape();
+}`,
+  "Perlin Terrain": `// Perlin Terrain
+function setup() {
+  createCanvas(400, 400);
+  noStroke();
+}
+
+function draw() {
+  background(20);
+  fill(37, 99, 235);
+  let step = 8;
+  for (let x = 0; x < width; x += step) {
+    let h = noise(x * 0.01, frameCount * 0.01) * height * 0.6;
+    rect(x, height - h, step, h);
+  }
+}`,
+  "Flow Field": `// Flow Field
+let particles = [];
+
+function setup() {
+  createCanvas(400, 400);
+  background(20);
+  for (let i = 0; i < 150; i++) {
+    particles.push(createVector(random(width), random(height)));
+  }
+}
+
+function draw() {
+  background(20, 15);
+  stroke(37, 99, 235);
+  strokeWeight(1);
+  for (const p of particles) {
+    let angle = noise(p.x * 0.01, p.y * 0.01, frameCount * 0.005) * TWO_PI * 2;
+    point(p.x, p.y);
+    p.x += cos(angle);
+    p.y += sin(angle);
+    if (p.x < 0) p.x = width;
+    if (p.x > width) p.x = 0;
+    if (p.y < 0) p.y = height;
+    if (p.y > height) p.y = 0;
+  }
+}`,
+  "Radial Wave": `// Radial Wave
+function setup() {
+  createCanvas(400, 400);
+  noFill();
+  strokeWeight(2);
+}
+
+function draw() {
+  background(20);
+  translate(width / 2, height / 2);
+  stroke(37, 99, 235);
+  beginShape();
+  for (let a = 0; a <= TWO_PI; a += 0.05) {
+    let r = 100 + 30 * sin(a * 6 + frameCount * 0.05);
+    vertex(cos(a) * r, sin(a) * r);
+  }
+  endShape(CLOSE);
+}`,
+  "Interference Pattern": `// Interference Pattern
+function setup() {
+  createCanvas(400, 400);
+  noStroke();
+}
+
+function draw() {
+  background(20);
+  fill(37, 99, 235);
+  let step = 6;
+  for (let x = 0; x < width; x += step) {
+    for (let y = 0; y < height; y += step) {
+      let d1 = dist(x, y, width * 0.35, height * 0.5);
+      let d2 = dist(x, y, width * 0.65, height * 0.5);
+      let v = sin(d1 * 0.15 - frameCount * 0.1) + sin(d2 * 0.15 - frameCount * 0.1);
+      if (v > 1.2) circle(x, y, step);
+    }
+  }
+}`,
+
+  // --- Particles & Systems --------------------------------------------------
+  "Particle Swarm": `// Particle Swarm
 let particles = [];
 
 function setup() {
@@ -130,6 +354,215 @@ function draw() {
   for (const p of particles) {
     p.a += p.s;
     circle(width / 2 + cos(p.a) * p.r, height / 2 + sin(p.a) * p.r, 6);
+  }
+}`,
+  "Fireworks Burst": `// Fireworks Burst
+let particles = [];
+
+function setup() {
+  createCanvas(400, 400);
+  background(10);
+}
+
+function burst(x, y) {
+  for (let i = 0; i < 60; i++) {
+    let a = random(TWO_PI);
+    let s = random(1, 5);
+    particles.push({ x, y, vx: cos(a) * s, vy: sin(a) * s, life: 60 });
+  }
+}
+
+function draw() {
+  background(10, 40);
+  if (frameCount % 45 === 1) {
+    burst(random(100, 300), random(100, 250));
+  }
+  noStroke();
+  fill(234, 88, 12);
+  for (let i = particles.length - 1; i >= 0; i--) {
+    let p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.03;
+    p.life -= 1;
+    circle(p.x, p.y, 4);
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}`,
+  "Particle Trail": `// Particle Trail
+let trail = [];
+
+function setup() {
+  createCanvas(400, 400);
+}
+
+function draw() {
+  background(20, 30);
+  let x = width / 2 + cos(frameCount * 0.05) * 140;
+  let y = height / 2 + sin(frameCount * 0.07) * 100;
+  trail.push({ x, y });
+  if (trail.length > 80) trail.shift();
+  noStroke();
+  for (let i = 0; i < trail.length; i++) {
+    let t = trail[i];
+    fill(37, 99, 235, (i / trail.length) * 255);
+    circle(t.x, t.y, 10 * (i / trail.length));
+  }
+}`,
+  "Attractor Swarm": `// Attractor Swarm
+let particles = [];
+
+function setup() {
+  createCanvas(400, 400);
+  for (let i = 0; i < 120; i++) {
+    particles.push({ x: random(width), y: random(height), vx: 0, vy: 0 });
+  }
+  noStroke();
+}
+
+function draw() {
+  background(20, 40);
+  let mx = width / 2 + cos(frameCount * 0.02) * 100;
+  let my = height / 2 + sin(frameCount * 0.02) * 100;
+  fill(37, 99, 235);
+  for (const p of particles) {
+    let dx = mx - p.x;
+    let dy = my - p.y;
+    let d = max(20, sqrt(dx * dx + dy * dy));
+    p.vx += (dx / d) * 0.3;
+    p.vy += (dy / d) * 0.3;
+    p.vx *= 0.95;
+    p.vy *= 0.95;
+    p.x += p.vx;
+    p.y += p.vy;
+    circle(p.x, p.y, 5);
+  }
+}`,
+  "Snow Fall": `// Snow Fall
+let flakes = [];
+
+function setup() {
+  createCanvas(400, 400);
+  for (let i = 0; i < 120; i++) {
+    flakes.push({ x: random(width), y: random(height), s: random(1, 3) });
+  }
+  noStroke();
+}
+
+function draw() {
+  background(20);
+  fill(255);
+  for (const f of flakes) {
+    f.y += f.s;
+    f.x += sin(frameCount * 0.02 + f.y * 0.05);
+    if (f.y > height) {
+      f.y = 0;
+      f.x = random(width);
+    }
+    circle(f.x, f.y, f.s * 2);
+  }
+}`,
+
+  // --- Color & Pattern -------------------------------------------------------
+  "Color Grid": `// Color Grid
+function setup() {
+  createCanvas(400, 400);
+  noStroke();
+  colorMode(HSB, 360, 100, 100);
+}
+
+function draw() {
+  background(0, 0, 8);
+  let step = 25;
+  for (let x = 0; x < width; x += step) {
+    for (let y = 0; y < height; y += step) {
+      let hue = (x + y + frameCount) % 360;
+      fill(hue, 70, 90);
+      rect(x, y, step - 2, step - 2);
+    }
+  }
+}`,
+  "Gradient Sweep": `// Gradient Sweep
+function setup() {
+  createCanvas(400, 400);
+  colorMode(HSB, 360, 100, 100);
+}
+
+function draw() {
+  for (let y = 0; y < height; y++) {
+    let hue = (y + frameCount) % 360;
+    stroke(hue, 70, 90);
+    line(0, y, width, y);
+  }
+}`,
+  "Checkerboard Shift": `// Checkerboard Shift
+function setup() {
+  createCanvas(400, 400);
+  noStroke();
+}
+
+function draw() {
+  background(20);
+  let step = 40;
+  let offset = floor(frameCount / 20) % 2;
+  for (let x = 0; x < width; x += step) {
+    for (let y = 0; y < height; y += step) {
+      let i = floor(x / step) + floor(y / step);
+      if ((i + offset) % 2 === 0) {
+        fill(37, 99, 235);
+      } else {
+        fill(30);
+      }
+      rect(x, y, step, step);
+    }
+  }
+}`,
+  "Mosaic Tiles": `// Mosaic Tiles
+let seedVals = [];
+const mosaicCols = 10;
+
+function setup() {
+  createCanvas(400, 400);
+  noStroke();
+  colorMode(HSB, 360, 100, 100);
+  for (let i = 0; i < mosaicCols * mosaicCols; i++) {
+    seedVals.push(random(360));
+  }
+}
+
+function draw() {
+  background(0, 0, 8);
+  let step = width / mosaicCols;
+  for (let i = 0; i < mosaicCols; i++) {
+    for (let j = 0; j < mosaicCols; j++) {
+      let idx = i * mosaicCols + j;
+      let hue = (seedVals[idx] + frameCount * 0.3) % 360;
+      fill(hue, 60, 85);
+      rect(i * step, j * step, step - 2, step - 2);
+    }
+  }
+}`,
+  "Pulsing Dots": `// Pulsing Dots
+function setup() {
+  createCanvas(400, 400);
+  noStroke();
+  colorMode(HSB, 360, 100, 100);
+}
+
+function draw() {
+  background(0, 0, 8);
+  let step = 30;
+  let cols = width / step;
+  let rows = height / step;
+  for (let i = 0; i < cols; i++) {
+    for (let j = 0; j < rows; j++) {
+      let x = i * step + step / 2;
+      let y = j * step + step / 2;
+      let d = dist(x, y, width / 2, height / 2);
+      let s = 6 + 6 * sin(frameCount * 0.08 - d * 0.05);
+      fill((d + frameCount) % 360, 70, 90);
+      circle(x, y, max(2, s));
+    }
   }
 }`,
 };

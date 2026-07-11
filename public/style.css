@@ -507,6 +507,26 @@ body::-webkit-scrollbar-thumb:hover {
   background: var(--muted);
 }
 
+.menu-list-scroll {
+  max-height: min(70vh, 480px);
+  overflow-y: auto;
+}
+
+.menu-section-label {
+  padding: 8px 10px 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.menu-section-label:not(:first-child) {
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
 .menu-item {
   width: 100%;
   border: none;
