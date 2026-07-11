@@ -88,42 +88,68 @@
             </ul>
           </div>
           <div class="menu-group">
-            <button class="menu-button" type="button" aria-haspopup="true" aria-expanded="false" data-menu="examples-menu">Examples</button>
-            <ul class="menu-list menu-list-scroll" id="examples-menu" role="menu" hidden>
-              <li role="none" class="menu-section-label">Motion &amp; Physics</li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Bouncing Ball">Bouncing Ball</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Random Walker">Random Walker</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Spring Follow">Spring Follow</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Gravity Bounce">Gravity Bounce</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Orbiting Body">Orbiting Body</button></li>
-
-              <li role="none" class="menu-section-label">Shapes &amp; Geometry</li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Spinning Square">Spinning Square</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Grid of Circles">Grid of Circles</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Polygon Pulse">Polygon Pulse</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Concentric Rings">Concentric Rings</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Star Field">Star Field</button></li>
-
-              <li role="none" class="menu-section-label">Waves &amp; Noise</li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Sine Wave">Sine Wave</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Perlin Terrain">Perlin Terrain</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Flow Field">Flow Field</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Radial Wave">Radial Wave</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Interference Pattern">Interference Pattern</button></li>
-
-              <li role="none" class="menu-section-label">Particles &amp; Systems</li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Particle Swarm">Particle Swarm</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Fireworks Burst">Fireworks Burst</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Particle Trail">Particle Trail</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Attractor Swarm">Attractor Swarm</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Snow Fall">Snow Fall</button></li>
-
-              <li role="none" class="menu-section-label">Color &amp; Pattern</li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Color Grid">Color Grid</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Gradient Sweep">Gradient Sweep</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Checkerboard Shift">Checkerboard Shift</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Mosaic Tiles">Mosaic Tiles</button></li>
-              <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Pulsing Dots">Pulsing Dots</button></li>
+            <button class="menu-button" type="button" aria-haspopup="true" aria-expanded="false" data-menu="examples-menu">Code</button>
+            <ul class="menu-list" id="examples-menu" role="menu" hidden>
+              <li role="none" class="menu-group-item">
+                <button class="menu-submenu-toggle" type="button" aria-haspopup="true">Motion &amp; Physics</button>
+                <ul class="menu-list submenu" role="menu">
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Bouncing Ball">Bouncing Ball</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Random Walker">Random Walker</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Spring Follow">Spring Follow</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Gravity Bounce">Gravity Bounce</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Orbiting Body">Orbiting Body</button></li>
+                </ul>
+              </li>
+              <li role="none" class="menu-group-item">
+                <button class="menu-submenu-toggle" type="button" aria-haspopup="true">Shapes &amp; Geometry</button>
+                <ul class="menu-list submenu" role="menu">
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Spinning Square">Spinning Square</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Grid of Circles">Grid of Circles</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Polygon Pulse">Polygon Pulse</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Concentric Rings">Concentric Rings</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Star Field">Star Field</button></li>
+                </ul>
+              </li>
+              <li role="none" class="menu-group-item">
+                <button class="menu-submenu-toggle" type="button" aria-haspopup="true">Waves &amp; Noise</button>
+                <ul class="menu-list submenu" role="menu">
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Sine Wave">Sine Wave</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Perlin Terrain">Perlin Terrain</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Flow Field">Flow Field</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Radial Wave">Radial Wave</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Interference Pattern">Interference Pattern</button></li>
+                </ul>
+              </li>
+              <li role="none" class="menu-group-item">
+                <button class="menu-submenu-toggle" type="button" aria-haspopup="true">Particles &amp; Systems</button>
+                <ul class="menu-list submenu" role="menu">
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Particle Swarm">Particle Swarm</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Fireworks Burst">Fireworks Burst</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Particle Trail">Particle Trail</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Attractor Swarm">Attractor Swarm</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Snow Fall">Snow Fall</button></li>
+                </ul>
+              </li>
+              <li role="none" class="menu-group-item">
+                <button class="menu-submenu-toggle" type="button" aria-haspopup="true">Color &amp; Pattern</button>
+                <ul class="menu-list submenu" role="menu">
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Color Grid">Color Grid</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Gradient Sweep">Gradient Sweep</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Checkerboard Shift">Checkerboard Shift</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Mosaic Tiles">Mosaic Tiles</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Pulsing Dots">Pulsing Dots</button></li>
+                </ul>
+              </li>
+              <li role="none" class="menu-group-item">
+                <button class="menu-submenu-toggle" type="button" aria-haspopup="true">Sound</button>
+                <ul class="menu-list submenu" role="menu">
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Tone Beep">Tone Beep</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Frequency Sweep">Frequency Sweep</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Click Synth">Click Synth</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Waveform Visualizer">Waveform Visualizer</button></li>
+                  <li role="none"><button class="menu-item" type="button" role="menuitem" data-action="Volume Pulse">Volume Pulse</button></li>
+                </ul>
+              </li>
             </ul>
           </div>
         </nav>

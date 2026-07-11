@@ -44,7 +44,7 @@ below). The default, bundled build keeps the app fully offline.
 - **`src/main.cpp`** - the entire C++ application. Entry point, HTTP routes,
   window creation, per-OS icon handling, and graceful shutdown.
 - **`public/`** - the frontend, embedded into the binary via `cpp-embedlib`:
-  - `index.html` - layout: menu bar (Run, Stop, File, Examples), Ace editor + p5
+  - `index.html` - layout: menu bar (Run, Stop, File, Code), Ace editor + p5
     version label (left), sketch preview (right), a draggable horizontal splitter,
     a resizable status/terminal row (bottom), and a collapsible side panel with a
     Capture section (Record / Capture PNG / Full Window / Fullscreen), a Sketch
@@ -52,13 +52,21 @@ below). The default, bundled build keeps the app fully offline.
     picker for the area behind the canvas), and a Libraries section (p5.js build
     picker + Import JS Library). Stop tears down the sketch iframe; the
     `.splitter` resizes the editor/preview split and `.h-splitter` the terminal
-    height (both drive CSS custom properties on the grid). The Examples menu
-    (`#examples-menu`) is grouped into five topics of five sketches each
-    (Motion & Physics, Shapes & Geometry, Waves & Noise, Particles & Systems,
-    Color & Pattern) via `.menu-section-label` headers; the sketch source lives
-    in `script.js`'s `examples` object, keyed by the same label text as the
-    `data-action` on each `<li>` button. Keep the two in sync when adding
-    examples - a mismatched key silently no-ops (see `loadExample()`).
+    height (both drive CSS custom properties on the grid). The "Code" button
+    (labelled "Examples" until a later rename - `data-menu="examples-menu"`
+    and `#examples-menu` keep the old internal names) opens a menu of six
+    topics (Motion & Physics, Shapes & Geometry, Waves & Noise, Particles &
+    Systems, Color & Pattern, Sound), each a `.menu-group-item` whose
+    `.menu-submenu-toggle` button reveals a flyout `.submenu` (CSS
+    `:hover`/`:focus-within`, `.menu-group-item { position: relative }` +
+    `.submenu { position: absolute; left: calc(100% + 4px) }` - no JS needed
+    to open/close them). The sketch source lives in `script.js`'s `examples`
+    object, keyed by the same label text as the `data-action` on each
+    example `<li>` button. Keep the two in sync when adding examples - a
+    mismatched key silently no-ops (see `loadExample()`). The Sound topic's
+    5 examples use raw `AudioContext` directly (no p5.sound bundled) so
+    they're intercepted by the Sound panel's master gain wrapper the same
+    as any other audio-producing sketch (see the Sound section below).
   - `#tab-strip` (above the editor) + `#layers-panel` (right half of the
     bottom row) - the layer system from `docs/proposals/layer-system.md`,
     Phases 1-4: multi-session editing, stacked/composited layers, and

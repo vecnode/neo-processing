@@ -677,6 +677,149 @@ function draw() {
     }
   }
 }`,
+
+  // --- Sound (raw Web Audio - works with the app's Sound panel master
+  // on/off + volume, which wraps AudioContext regardless of how a sketch
+  // creates one; see docs/proposals/sound-section.md) --------------------
+  "Tone Beep": `// Tone Beep
+let ctx, osc, gain;
+
+function setup() {
+  createCanvas(300, 300);
+  ctx = new AudioContext();
+  gain = ctx.createGain();
+  gain.gain.value = 0;
+  gain.connect(ctx.destination);
+  osc = ctx.createOscillator();
+  osc.frequency.value = 440;
+  osc.connect(gain);
+  osc.start();
+}
+
+function draw() {
+  background(20);
+  if (frameCount % 60 === 0) {
+    gain.gain.setTargetAtTime(0.4, ctx.currentTime, 0.01);
+    gain.gain.setTargetAtTime(0, ctx.currentTime + 0.1, 0.05);
+  }
+  noStroke();
+  fill(37, 99, 235);
+  circle(width / 2, height / 2, 60 + gain.gain.value * 200);
+}`,
+  "Frequency Sweep": `// Frequency Sweep
+let ctx, osc, gain;
+
+function setup() {
+  createCanvas(300, 300);
+  ctx = new AudioContext();
+  gain = ctx.createGain();
+  gain.gain.value = 0.15;
+  gain.connect(ctx.destination);
+  osc = ctx.createOscillator();
+  osc.frequency.value = 200;
+  osc.connect(gain);
+  osc.start();
+}
+
+function draw() {
+  background(20);
+  let freq = 200 + 400 * (0.5 + 0.5 * sin(frameCount * 0.02));
+  osc.frequency.setTargetAtTime(freq, ctx.currentTime, 0.05);
+  noStroke();
+  fill(234, 88, 12);
+  let barX = map(freq, 200, 600, 20, width - 20);
+  rect(barX - 5, 0, 10, height);
+}`,
+  "Click Synth": `// Click Synth
+let ctx;
+let ripples = [];
+
+function setup() {
+  createCanvas(300, 300);
+  ctx = new AudioContext();
+}
+
+function mousePressed() {
+  let osc = ctx.createOscillator();
+  let g = ctx.createGain();
+  osc.frequency.value = random([220, 330, 440, 550]);
+  g.gain.value = 0.3;
+  osc.connect(g);
+  g.connect(ctx.destination);
+  osc.start();
+  g.gain.setTargetAtTime(0, ctx.currentTime + 0.05, 0.08);
+  osc.stop(ctx.currentTime + 0.6);
+  ripples.push({ x: mouseX, y: mouseY, r: 0 });
+}
+
+function draw() {
+  background(20);
+  noFill();
+  stroke(37, 99, 235);
+  strokeWeight(2);
+  for (let i = ripples.length - 1; i >= 0; i--) {
+    let rp = ripples[i];
+    rp.r += 4;
+    circle(rp.x, rp.y, rp.r);
+    if (rp.r > 200) ripples.splice(i, 1);
+  }
+}`,
+  "Waveform Visualizer": `// Waveform Visualizer
+let ctx, osc, analyser, data;
+
+function setup() {
+  createCanvas(300, 300);
+  ctx = new AudioContext();
+  osc = ctx.createOscillator();
+  osc.frequency.value = 220;
+  analyser = ctx.createAnalyser();
+  analyser.fftSize = 512;
+  data = new Uint8Array(analyser.fftSize);
+  let gain = ctx.createGain();
+  gain.gain.value = 0.2;
+  osc.connect(gain);
+  gain.connect(analyser);
+  analyser.connect(ctx.destination);
+  osc.start();
+}
+
+function draw() {
+  background(20);
+  analyser.getByteTimeDomainData(data);
+  noFill();
+  stroke(37, 99, 235);
+  strokeWeight(2);
+  beginShape();
+  for (let i = 0; i < data.length; i++) {
+    let x = map(i, 0, data.length, 0, width);
+    let y = map(data[i], 0, 255, 0, height);
+    vertex(x, y);
+  }
+  endShape();
+}`,
+  "Volume Pulse": `// Volume Pulse
+let ctx, osc, gain;
+
+function setup() {
+  createCanvas(300, 300);
+  ctx = new AudioContext();
+  osc = ctx.createOscillator();
+  osc.frequency.value = 110;
+  gain = ctx.createGain();
+  gain.gain.value = 0;
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start();
+}
+
+function draw() {
+  background(20);
+  let level = 0.5 + 0.5 * sin(frameCount * 0.05);
+  gain.gain.setTargetAtTime(level * 0.3, ctx.currentTime, 0.02);
+  noStroke();
+  fill(37, 99, 235);
+  circle(width / 2, height / 2, 40 + level * 220);
+}`,
 };
 
 let isResizingPanels = false;
