@@ -24,8 +24,10 @@ full-screen deployment.
   PNG frame, both rendered at the sketch's declared size and saved to `outputs/`.
 - **Fullscreen preview** — present the sketch centred at its exact size on a
   white backdrop; press Esc to exit.
-- **Local-first & offline** — the frontend and p5.js are embedded into the
-  binary and served from a loopback HTTP server; nothing is fetched at runtime.
+- **Local-first & offline** — the frontend and the bundled p5.js build are
+  embedded into the binary and served from a loopback HTTP server. No internet
+  access is required to run the app, **unless** you opt into an online p5.js
+  build from the Libraries panel, which loads that build from a CDN.
 - **Save to disk** — export the current sketch to a timestamped `.js` file under
   `outputs/`.
 
@@ -61,7 +63,7 @@ For a deeper description of the codebase, see [AGENTS.md](./AGENTS.md).
 | CMake ≥ 3.20     | Build system. |
 | C++20 compiler   | Windows: Visual Studio 2022 Build Tools (MSVC). Linux: GCC or Clang. |
 | Git              | Required — CMake `FetchContent` downloads dependencies from Git. |
-| Internet access  | Needed on the **first** configure to download dependencies. |
+| Internet access  | Needed on the **first** configure to download build dependencies (see below). Not needed at runtime — see "Local-first & offline" above. |
 
 **Windows runtime:** Microsoft Edge WebView2 Runtime.
 
@@ -100,7 +102,17 @@ Use `--config Debug` (and the `Debug` output folder) for a debug build.
 
 To produce a distributable build, run `.\build_and_distribute.bat` (Windows): it
 builds Release and copies the `build\Release` folder (executable, icons, and any
-runtime DLLs) to `%USERPROFILE%\Desktop\neo-processing`.
+runtime DLLs) to `%USERPROFILE%\Desktop\neo-processing`. The Windows executable's
+own file icon (as shown in Explorer, the taskbar, and Alt+Tab) is embedded at
+build time from `icons/app_icon.ico` via `icons/app.rc` — no separate
+post-processing step is needed.
+
+### Continuous integration
+
+[`.github/workflows/build.yml`](./.github/workflows/build.yml) builds Release
+distributables for Windows and Linux on every push/PR to `main` (and on manual
+trigger), and uploads each as a workflow artifact
+(`neo-processing-windows`, `neo-processing-linux`).
 
 ## Dependencies
 
@@ -126,8 +138,9 @@ public/             Frontend, embedded into the binary at build time
   style.css         Styling
   libs/             Vendored Ace + p5.js
 outputs/            Saved sketches (runtime output)
-icons/              Application icons
+icons/              Application icons (+ app.rc, embedded as the .exe's file icon on Windows)
 assets/             README images
+.github/workflows/  CI: builds Windows + Linux distributables
 CMakeLists.txt      Build configuration
 AGENTS.md           Detailed guide for contributors and AI agents
 ```

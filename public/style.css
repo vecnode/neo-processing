@@ -37,6 +37,13 @@ body {
   scrollbar-color: var(--border-strong) transparent;
 }
 
+html {
+  /* App starts at 80% zoom so the editor/preview get more effective screen
+     space; a plain CSS zoom keeps every element (fonts, paddings, controls)
+     scaled together instead of hand-tuning individual sizes. */
+  zoom: 0.8;
+}
+
 body {
   background: var(--bg);
 }

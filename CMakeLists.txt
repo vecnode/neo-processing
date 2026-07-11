@@ -78,7 +78,14 @@ cpp_embedlib_add(WebAssets
     NAMESPACE Web
 )
 
-add_executable(neo-processing src/main.cpp)
+if(WIN32)
+    # Embeds icons/app_icon.ico as the PE resource icon, so Explorer/taskbar
+    # show it as neo-processing.exe's own file icon (independent of the
+    # runtime window icon main.cpp loads from icons/*.ico at startup).
+    set(APP_ICON_RESOURCE ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.rc)
+endif()
+
+add_executable(neo-processing src/main.cpp ${APP_ICON_RESOURCE})
 
 target_link_libraries(neo-processing PRIVATE
     httplib::httplib
