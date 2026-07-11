@@ -11,8 +11,7 @@
 
 neo-processing ships as a **single self-contained executable**. It embeds a code
 editor and a live preview into a native desktop window, so you can write a p5.js
-sketch on the left and watch it run on the right, with the goal of real-world,
-full-screen deployment.
+sketch with the goal of real-world, full-screen deployment.
 
 > **Status:** v0.1.0 - active development. Interfaces and features may change.
 

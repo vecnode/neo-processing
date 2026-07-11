@@ -24,6 +24,8 @@
           <p class="panel-hint" id="capture-hint">Run a sketch, then record video or capture a frame. Files are saved to <code>outputs/</code>.</p>
         </section>
 
+        <hr class="panel-separator">
+
         <section class="panel-section">
           <h2>Sketch</h2>
           <div class="sketch-bg-row">
@@ -40,6 +42,8 @@
           <p class="panel-hint">The colour behind the sketch canvas (the area around it).</p>
         </section>
 
+        <hr class="panel-separator">
+
         <section class="panel-section">
           <h2>Sound</h2>
           <div class="sketch-bg-row">
@@ -53,8 +57,9 @@
             <span class="sketch-bg-label">Master</span>
             <input type="range" id="audio-master-slider" min="0" max="1" step="0.01" value="1" aria-label="Master volume">
           </div>
-          <p class="panel-hint">Sketch audio is muted by default. A click inside the sketch may be needed to start sound (browser autoplay policy).</p>
         </section>
+
+        <hr class="panel-separator">
 
         <section class="panel-section">
           <h2>Libraries</h2>
@@ -126,6 +131,9 @@
           </div>
         </nav>
         <div class="top-row-actions">
+          <button id="copyright-button" class="theme-toggle-button" type="button" aria-haspopup="dialog" aria-label="Show copyright">
+            <span aria-hidden="true">&#169;</span>
+          </button>
           <button id="theme-toggle-button" class="theme-toggle-button" type="button" aria-pressed="false" aria-label="Switch to dark theme">
             <span class="theme-toggle-icon" aria-hidden="true">&#9789;</span>
           </button>
@@ -158,6 +166,15 @@
         <span class="status-label">>_</span>
         <output id="terminal" aria-live="polite"></output>
       </footer>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="copyright-overlay" hidden>
+    <div class="modal-dialog" id="copyright-dialog" role="dialog" aria-modal="true" aria-labelledby="copyright-title">
+      <button id="copyright-close-button" class="modal-close-button" type="button" aria-label="Close">&#215;</button>
+      <h2 id="copyright-title">Copyright</h2>
+      <p>&#169; vecnode. neo-processing is released under the MIT License.</p>
+      <p><a href="https://github.com/vecnode/neo-processing" id="copyright-github-link" rel="noopener">github.com/vecnode/neo-processing</a></p>
     </div>
   </div>
 

@@ -17,12 +17,14 @@
 #include <thread>
 
 #ifdef __linux__
+#include <gio/gio.h>
 #include <gtk/gtk.h>
 #include <limits.h>
 #include <unistd.h>
 #endif
 
 #ifdef _WIN32
+#include <shellapi.h>
 #include <windows.h>
 #endif
 
@@ -412,6 +414,22 @@ int main() {
       set_desktop_fullscreen(GTK_WINDOW(window_result.value()), enable);
 #endif
     }
+    return "null";
+  });
+
+  // Exposed to the frontend as window.neoOpenRepo(): opens the project's
+  // GitHub page in the user's default system browser. Deliberately a
+  // fixed, no-argument binding (not "open any URL") so no string crosses
+  // the JS->C++ boundary - the target is hardcoded here, not passed in.
+  w.bind("neoOpenRepo", [](const std::string &) -> std::string {
+#ifdef _WIN32
+    ShellExecuteW(nullptr, L"open", L"https://github.com/vecnode/neo-processing",
+                  nullptr, nullptr, SW_SHOWNORMAL);
+#endif
+#ifdef __linux__
+    g_app_info_launch_default_for_uri("https://github.com/vecnode/neo-processing",
+                                       nullptr, nullptr);
+#endif
     return "null";
   });
 

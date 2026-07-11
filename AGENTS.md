@@ -170,7 +170,15 @@ background, so the canvas shows at its exact pixel size in the middle. Esc exits
   C++ (`main.cpp`) that strips the window frame and stretches it over the monitor
   (Win32) or calls `gtk_window_fullscreen` (Linux), so the sketch covers the
   whole desktop. On exit, the `fullscreenchange` handler restores the native
-  window. This is the only JS→C++ bridge in the app.
+  window.
+
+There is one other JS->C++ bridge: `window.neoOpenRepo()`, bound in `main.cpp`,
+opens the project's GitHub page in the user's default system browser
+(`ShellExecuteW` on Windows, `g_app_info_launch_default_for_uri` on Linux via
+GIO). Used by the copyright popup's link (`#copyright-github-link` in
+`script.js`) instead of letting an `<a>` navigate the app's own webview away
+from `127.0.0.1` - deliberately a fixed, no-argument binding (the target URL
+is hardcoded in C++, not passed in from JS) so no string crosses the bridge.
 
 ### Libraries (p5.js build selection)
 

@@ -104,6 +104,12 @@ if(APPLE)
 endif()
 
 if(WIN32)
+    # ShellExecuteW, used to open the GitHub link in the user's default
+    # browser (never navigate the app's own webview to an external site).
+    target_link_libraries(neo-processing PRIVATE Shell32)
+endif()
+
+if(WIN32)
     # Build as a GUI app (Windows subsystem) so no console window pops up when
     # the executable is launched. Keep the standard int main() entry point by
     # pointing the linker at the CRT's main startup (MSVC); MinGW's -mwindows
