@@ -71,6 +71,58 @@ if (themeToggleButton) {
 
 initTheme();
 
+// Copyright popup: a simple modal, opened from the top bar.
+const copyrightButton = document.getElementById("copyright-button");
+const copyrightOverlay = document.getElementById("copyright-overlay");
+const copyrightCloseButton = document.getElementById("copyright-close-button");
+const copyrightGithubLink = document.getElementById("copyright-github-link");
+
+function openCopyrightModal() {
+  if (copyrightOverlay) {
+    copyrightOverlay.hidden = false;
+  }
+}
+
+function closeCopyrightModal() {
+  if (copyrightOverlay) {
+    copyrightOverlay.hidden = true;
+  }
+}
+
+if (copyrightButton) {
+  copyrightButton.addEventListener("click", openCopyrightModal);
+}
+
+if (copyrightCloseButton) {
+  copyrightCloseButton.addEventListener("click", closeCopyrightModal);
+}
+
+if (copyrightOverlay) {
+  copyrightOverlay.addEventListener("click", (event) => {
+    if (event.target === copyrightOverlay) {
+      closeCopyrightModal();
+    }
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && copyrightOverlay && !copyrightOverlay.hidden) {
+    closeCopyrightModal();
+  }
+});
+
+if (copyrightGithubLink) {
+  // Open in the user's default system browser (window.neoOpenRepo, bound in
+  // main.cpp) instead of letting the link navigate the app's own webview
+  // away from 127.0.0.1.
+  copyrightGithubLink.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (window.neoOpenRepo) {
+      window.neoOpenRepo();
+    }
+  });
+}
+
 // Version of the bundled p5.js library (public/libs/p5-<version>.min.js).
 // Single source of truth for the default build the sketch iframe loads.
 const P5_VERSION = "1.11.3";

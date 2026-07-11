@@ -118,8 +118,10 @@ body {
   color: var(--muted);
 }
 
-.panel-section + .panel-section {
-  margin-top: 24px;
+.panel-separator {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 24px 0;
 }
 
 .panel-controls {
@@ -628,6 +630,71 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .theme-toggle-button:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-overlay[hidden] {
+  display: none;
+}
+
+.modal-dialog {
+  position: relative;
+  width: 80%;
+  height: 80%;
+  padding: 32px;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow-y: auto;
+}
+
+.modal-dialog h2 {
+  margin: 0 0 16px;
+}
+
+.modal-dialog p {
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.modal-dialog a {
+  color: var(--accent);
+}
+
+.modal-close-button {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.modal-close-button:hover {
+  border-color: var(--accent);
+}
+
+.modal-close-button:focus-visible {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
