@@ -811,12 +811,24 @@ function positionLayerIframe(layer) {
   layer.iframe.style.height = `${h}px`;
 
   if (sketchAnchor === "center") {
-    const rect = rightPanel.getBoundingClientRect();
-    layer.iframe.style.left = `${Math.max(0, (rect.width - w) / 2)}px`;
-    layer.iframe.style.top = `${Math.max(0, (rect.height - h) / 2)}px`;
+    // Deliberately not using .right-panel.getBoundingClientRect() here: the
+    // app runs at html { zoom: 0.8 } (see style.css), and getBoundingClientRect()
+    // reports post-zoom (visual) pixels while inline style px values like
+    // `w`/`h` above are pre-zoom (logical) - mixing the two threw centering
+    // off by exactly the zoom factor (confirmed: setting width:200px
+    // rendered as an actual 160px box). The classic 50% + negative-margin
+    // centering trick sidesteps this entirely, since both the percentage
+    // and the margin resolve within the iframe's own local coordinate
+    // system - no cross-context pixel math, so it's correct at any zoom.
+    layer.iframe.style.left = "50%";
+    layer.iframe.style.top = "50%";
+    layer.iframe.style.marginLeft = `${-w / 2}px`;
+    layer.iframe.style.marginTop = `${-h / 2}px`;
   } else {
     layer.iframe.style.left = "0px";
     layer.iframe.style.top = "0px";
+    layer.iframe.style.marginLeft = "0px";
+    layer.iframe.style.marginTop = "0px";
   }
 }
 
@@ -1074,7 +1086,7 @@ function initializeEditor() {
   aceEditor = ace.edit("ace-editor");
   aceEditor.setTheme(document.documentElement.getAttribute("data-theme") === "dark" ? ACE_THEME_DARK : ACE_THEME_LIGHT);
   aceEditor.setOptions({
-    fontSize: "14px",
+    fontSize: "11px",
     showPrintMargin: false,
     wrap: true,
   });
@@ -1741,11 +1753,17 @@ async function buildCompositeCanvas() {
       return;
     }
     const layer = visibleLayers[index];
-    const left = parseFloat(layer.iframe.style.left) || 0;
-    const top = parseFloat(layer.iframe.style.top) || 0;
+    // getBoundingClientRect() on both the layer's iframe and .right-panel
+    // (used for `rect` above) are measured the same way, so this stays
+    // correct regardless of the app's html { zoom: 0.8 } - unlike parsing
+    // iframe.style.left/top, which can be "50%" for centred layers (see
+    // positionLayerIframe()) and isn't a pixel value at all.
+    const iframeRect = layer.iframe.getBoundingClientRect();
+    const left = iframeRect.x - rect.x;
+    const top = iframeRect.y - rect.y;
     ctx.save();
     ctx.globalAlpha = typeof layer.opacity === "number" ? layer.opacity : 1;
-    ctx.drawImage(frame.bitmap, left, top, frame.w, frame.h);
+    ctx.drawImage(frame.bitmap, left, top, iframeRect.width, iframeRect.height);
     ctx.restore();
     frame.bitmap.close();
   });
