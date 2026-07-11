@@ -712,6 +712,161 @@ let audioMasterVolume = 1;
 const audioToggleButtons = document.querySelectorAll(".segmented-btn[data-audio]");
 const audioMasterSlider = document.getElementById("audio-master-slider");
 
+// Layers (see docs/proposals/layer-system.md). Phase 1: multi-session
+// editing only - one Ace EditSession per layer/tab, each keeping its own
+// undo history, cursor, and scroll position. Only one iframe still ever
+// runs at a time (today's single-sketch behaviour); which code Run uses is
+// just whichever tab is active. Compositing/multiple simultaneous running
+// layers is a later phase.
+const MAX_LAYERS = 10;
+const tabStrip = document.getElementById("tab-strip");
+let layers = [];
+let activeLayerId = null;
+let nextLayerNumber = 1;
+
+function createLayerSession(code) {
+  const session = ace.createEditSession(code, "ace/mode/javascript");
+  session.setTabSize(2);
+  session.setUseSoftTabs(true);
+  return session;
+}
+
+// Creates a new layer (not activated - call activateLayer() to switch to it).
+// Returns null if the MAX_LAYERS cap is already reached.
+function addLayer(code) {
+  if (layers.length >= MAX_LAYERS) {
+    appendStatus(`Maximum of ${MAX_LAYERS} layers reached`);
+    return null;
+  }
+
+  const layer = {
+    id: `layer-${nextLayerNumber}-${Date.now()}`,
+    name: `Layer ${nextLayerNumber}`,
+    session: createLayerSession(code),
+  };
+  nextLayerNumber += 1;
+  layers.push(layer);
+  return layer;
+}
+
+function activateLayer(id) {
+  const layer = layers.find((l) => l.id === id);
+  if (!layer || !aceEditor) {
+    return;
+  }
+
+  activeLayerId = id;
+  aceEditor.setSession(layer.session);
+  aceEditor.resize();
+  aceEditor.focus();
+  renderTabStrip();
+}
+
+// Closes a layer's tab (its Ace session and, later, its running iframe/
+// layer). Always keeps at least one layer - the last remaining tab can't be
+// closed.
+function closeLayer(id) {
+  if (layers.length <= 1) {
+    appendStatus("At least one layer is required");
+    return;
+  }
+
+  const index = layers.findIndex((l) => l.id === id);
+  if (index === -1) {
+    return;
+  }
+
+  const wasActive = id === activeLayerId;
+  layers.splice(index, 1);
+
+  if (wasActive) {
+    const next = layers[index] || layers[index - 1] || layers[0];
+    activateLayer(next.id);
+  } else {
+    renderTabStrip();
+  }
+}
+
+function renameLayer(id, name) {
+  const layer = layers.find((l) => l.id === id);
+  const trimmed = name.trim();
+  if (layer && trimmed) {
+    layer.name = trimmed;
+  }
+  renderTabStrip();
+}
+
+function renderTabStrip() {
+  if (!tabStrip) {
+    return;
+  }
+
+  tabStrip.innerHTML = "";
+
+  layers.forEach((layer) => {
+    const tab = document.createElement("div");
+    tab.className = "tab" + (layer.id === activeLayerId ? " is-active" : "");
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-selected", String(layer.id === activeLayerId));
+    tab.dataset.layerId = layer.id;
+
+    const label = document.createElement("span");
+    label.className = "tab-label";
+    label.textContent = layer.name;
+    label.title = layer.name;
+    label.addEventListener("dblclick", (event) => {
+      event.stopPropagation();
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "tab-rename-input";
+      input.value = layer.name;
+      label.replaceWith(input);
+      input.focus();
+      input.select();
+      const commit = () => renameLayer(layer.id, input.value);
+      input.addEventListener("blur", commit);
+      input.addEventListener("keydown", (keyEvent) => {
+        if (keyEvent.key === "Enter") {
+          input.blur();
+        } else if (keyEvent.key === "Escape") {
+          input.value = layer.name;
+          input.blur();
+        }
+      });
+    });
+
+    const closeButton = document.createElement("button");
+    closeButton.type = "button";
+    closeButton.className = "tab-close";
+    closeButton.setAttribute("aria-label", `Close ${layer.name}`);
+    closeButton.textContent = "×";
+    closeButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      closeLayer(layer.id);
+    });
+
+    tab.appendChild(label);
+    tab.appendChild(closeButton);
+    tab.addEventListener("click", () => activateLayer(layer.id));
+    tabStrip.appendChild(tab);
+  });
+
+  const addButton = document.createElement("button");
+  addButton.type = "button";
+  addButton.className = "tab-add-button";
+  addButton.setAttribute("aria-label", "Add layer");
+  addButton.textContent = "+";
+  addButton.disabled = layers.length >= MAX_LAYERS;
+  addButton.addEventListener("click", () => {
+    const layer = addLayer(defaultSketch);
+    if (layer) {
+      activateLayer(layer.id);
+      appendStatus(`Added ${layer.name}`);
+    }
+  });
+  tabStrip.appendChild(addButton);
+}
+
 function initializeEditor() {
   if (!aceContainer || typeof ace === "undefined") {
     return;
@@ -719,16 +874,14 @@ function initializeEditor() {
 
   aceEditor = ace.edit("ace-editor");
   aceEditor.setTheme(document.documentElement.getAttribute("data-theme") === "dark" ? ACE_THEME_DARK : ACE_THEME_LIGHT);
-  aceEditor.session.setMode("ace/mode/javascript");
-  aceEditor.session.setTabSize(2);
-  aceEditor.session.setUseSoftTabs(true);
   aceEditor.setOptions({
     fontSize: "14px",
     showPrintMargin: false,
     wrap: true,
   });
-  aceEditor.setValue(defaultSketch, -1);
-  aceEditor.resize();
+
+  const firstLayer = addLayer(defaultSketch);
+  activateLayer(firstLayer.id);
 }
 
 function getEditorContents() {

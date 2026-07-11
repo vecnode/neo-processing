@@ -59,6 +59,15 @@ below). The default, bundled build keeps the app fully offline.
     in `script.js`'s `examples` object, keyed by the same label text as the
     `data-action` on each `<li>` button. Keep the two in sync when adding
     examples - a mismatched key silently no-ops (see `loadExample()`).
+  - `#tab-strip` (above the editor) - the layer tabs from
+    `docs/proposals/layer-system.md`, Phase 1: multi-session editing only.
+    Each tab is one `ace.EditSession` (own undo history/cursor/scroll) in the
+    `layers` array (`script.js`); `activateLayer()` swaps the session on the
+    single `aceEditor` instance. Only one iframe still ever runs (Run uses
+    whichever tab is active) - compositing multiple simultaneously-running
+    layers is a later phase, not yet built. Hard cap of 10 layers
+    (`MAX_LAYERS`); at least one layer must always exist (`closeLayer()`
+    refuses to close the last one). Double-click a tab label to rename.
   - `libraries.json` - manifest of injectable p5.js builds (`{ id, name,
     version, url, isLocal }`); see the Libraries section below.
   - `script.js` - all UI logic: editor setup, menus, file open/save, panel

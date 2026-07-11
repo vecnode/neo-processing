@@ -1,8 +1,9 @@
 # Proposal: multi-layer sketches (tabs + compositing)
 
-Status: **proposal only** - not implemented. This is a design for review, in
-the same spirit as `docs/proposals/sound-section.md`. The "Open questions"
-section below has been resolved (2026-07-11) - see "Decisions" at the end.
+Status: **Phase 1 implemented** (2026-07-11) - multi-session tabs, no
+compositing yet. Phases 2-5 (stacking, capture/record rework, polish, sound
+broadcast) are still proposal-only. The "Open questions" section below has
+been resolved - see "Decisions" at the end.
 
 ## Goal
 
@@ -127,10 +128,10 @@ add, not v1).
 
 ## Phased plan
 
-1. **Tabs, no compositing.** Multi-session editor, add/close/rename tabs.
-   Only the active tab's layer renders (today's single-iframe behaviour,
-   just switchable) - proves the editor-side data model before touching
-   `.right-panel`.
+1. **✅ Tabs, no compositing (done).** Multi-session editor, add/close/rename
+   tabs. Only the active tab's layer renders (today's single-iframe
+   behaviour, just switchable) - proves the editor-side data model before
+   touching `.right-panel`.
 2. **Stacking + visibility/reorder.** Multiple iframes composited via CSS
    z-index; Layers panel controls visibility/order. Capture/Record
    temporarily scoped to "active layer only" with a clear, documented
