@@ -942,14 +942,6 @@ body::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.06);
 }
 
-.layer-swatch {
-  flex: 0 0 auto;
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  border: 1px solid var(--border-strong);
-}
-
 .layer-row-name {
   flex: 1 1 auto;
   overflow: hidden;

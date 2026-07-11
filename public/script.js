@@ -934,13 +934,9 @@ function renderLayersPanel() {
   const baseRow = document.createElement("div");
   baseRow.className = "layer-row is-base";
   baseRow.setAttribute("role", "listitem");
-  const baseSwatch = document.createElement("span");
-  baseSwatch.className = "layer-swatch";
-  baseSwatch.style.background = sketchBg;
   const baseName = document.createElement("span");
   baseName.className = "layer-row-name";
   baseName.textContent = "Layer 0 · Background";
-  baseRow.appendChild(baseSwatch);
   baseRow.appendChild(baseName);
   layersPanel.appendChild(baseRow);
 
@@ -1802,7 +1798,6 @@ if (importLibraryButton && importLibraryInput) {
 function applySketchBg(color) {
   sketchBg = color;
   document.documentElement.style.setProperty("--sketch-bg", color);
-  renderLayersPanel();
 }
 
 if (sketchBgColor) {
