@@ -1,5 +1,8 @@
 :root {
-  /* Warm, Anthropic-style palette: ivory surfaces, clay accent, soft borders. */
+  /* Warm, Anthropic-style palette: ivory surfaces, clay accent, soft borders.
+     This is the light theme (default). See [data-theme="dark"] below for the
+     dark variant - both themes are just overrides of these custom properties,
+     so anything that reads a var() here re-themes automatically. */
   --bg: #f0eee6;
   --surface: #f5f4ee;
   --panel: #ffffff;
@@ -11,12 +14,38 @@
   --accent-soft: rgba(37, 99, 235, 0.12);
   --border: #e4e2d8;
   --border-strong: #d7d4c8;
-  --terminal-bg: #262420;
-  --terminal-text: #cfcdc4;
+  /* Terminal (bottom-row) - light and readable in the light theme; the dark
+     theme restores the original always-dark look this used to have. */
+  --terminal-bg: var(--editor-bg);
+  --terminal-text: var(--muted);
+  --overlay-hover: rgba(26, 26, 24, 0.05);
+  --overlay-active: rgba(26, 26, 24, 0.06);
+  --transport-bg: #d7d4c8;
+  --transport-bg-hover: #c9c6ba;
   --shadow: 0 1px 2px rgba(40, 38, 32, 0.04), 0 6px 16px rgba(40, 38, 32, 0.06);
   --radius: 8px;
   --radius-sm: 6px;
   --sketch-bg: #ffffff;
+}
+
+[data-theme="dark"] {
+  --bg: #1a1917;
+  --surface: #201f1c;
+  --panel: #262420;
+  --editor-bg: #1e1c19;
+  --text: #ece9e1;
+  --muted: #9c9a90;
+  --border: #37352f;
+  --border-strong: #47443c;
+  /* Matches this app's original (theme-less) terminal colours exactly, so
+     dark mode looks like how the app always used to look. */
+  --terminal-bg: #262420;
+  --terminal-text: #cfcdc4;
+  --overlay-hover: rgba(255, 255, 255, 0.06);
+  --overlay-active: rgba(255, 255, 255, 0.09);
+  --transport-bg: #3a3833;
+  --transport-bg-hover: #46443d;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 16px rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -341,6 +370,38 @@ body {
   background: var(--editor-bg);
 }
 
+/* The vendored Ace "textmate" theme (public/libs/theme-textmate-css.js) hard-
+   codes light colours on .ace-tm and its descendants - there's no bundled
+   dark Ace theme (offline-first: we don't fetch one). Override just the base
+   surface/text/gutter/selection colours for dark mode; syntax token colours
+   (keyword/string/comment/constant) are left as the vendored theme's - they're
+   saturated enough to stay legible on a dark background. */
+[data-theme="dark"] .ace-tm {
+  background-color: var(--editor-bg);
+  color: var(--text);
+}
+
+[data-theme="dark"] .ace-tm .ace_gutter {
+  background: var(--panel);
+  color: var(--muted);
+}
+
+[data-theme="dark"] .ace-tm .ace_print-margin {
+  background: var(--border);
+}
+
+[data-theme="dark"] .ace-tm .ace_cursor {
+  color: var(--text);
+}
+
+[data-theme="dark"] .ace-tm .ace_marker-layer .ace_active-line {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="dark"] .ace-tm .ace_marker-layer .ace_selection {
+  background: rgba(37, 99, 235, 0.35);
+}
+
 .middle-panel h2 {
   margin: 0;
   font-size: 0.95rem;
@@ -418,7 +479,7 @@ body {
 }
 
 .menu-button:hover {
-  background: rgba(26, 26, 24, 0.05);
+  background: var(--overlay-hover);
 }
 
 .menu-button:focus-visible {
@@ -428,14 +489,14 @@ body {
 }
 
 .menu-button[aria-expanded="true"] {
-  background: rgba(26, 26, 24, 0.06);
+  background: var(--overlay-active);
   border-color: var(--border-strong);
 }
 
 /* Run / Stop — primary transport controls, neutral grey. */
 .run-button,
 .stop-button {
-  background: #d7d4c8;
+  background: var(--transport-bg);
   color: var(--text);
   border-color: var(--border-strong);
   font-weight: 700;
@@ -445,7 +506,7 @@ body {
 
 .run-button:hover,
 .stop-button:hover {
-  background: #c9c6ba;
+  background: var(--transport-bg-hover);
   border-color: var(--muted);
 }
 
@@ -543,6 +604,38 @@ body::-webkit-scrollbar-thumb:hover {
 .menu-item:hover {
   background: var(--accent-soft);
   color: var(--accent-hover);
+}
+
+.top-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-toggle-button {
+  width: 38px;
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--text);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.theme-toggle-button:hover {
+  border-color: var(--accent);
+}
+
+.theme-toggle-button:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .hamburger-button {

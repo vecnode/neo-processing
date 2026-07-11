@@ -66,7 +66,17 @@ below). The default, bundled build keeps the app fully offline.
   - `style.css` - styling. The `html` element is set to `zoom: 0.8` so the app
     starts at 80% of its natural size (more editor/preview space in the same
     window); this scales fonts, paddings, and controls together instead of
-    tuning each dimension by hand.
+    tuning each dimension by hand. Every colour is a CSS custom property
+    defined in `:root` (light theme, default) with dark-theme overrides in
+    `[data-theme="dark"]` - the top-row's theme toggle button
+    (`#theme-toggle-button`, wired in `script.js`'s `applyTheme()`) just flips
+    `data-theme` on `<html>` and persists the choice to `localStorage`
+    (`neo-theme`). Add new colours as `var(--token)` referencing a custom
+    property, not a literal hex, so they pick up both themes automatically.
+    The vendored Ace "textmate" theme hardcodes its own light colours; dark
+    mode overrides just its base surface/text/gutter/selection via
+    `[data-theme="dark"] .ace-tm ...` rules and leaves syntax token colours
+    as-is (no dark Ace theme is vendored, to stay offline-first).
   - `libs/` - vendored third-party JS (Ace editor, p5.js). These are committed.
     The bundled p5 version is declared once as `P5_VERSION` in `script.js`, which
     drives both the version label and the `<script>` URL the sketch iframe loads;

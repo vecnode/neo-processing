@@ -3,6 +3,7 @@ const terminalOutput = document.getElementById("terminal");
 const menuButtons = document.querySelectorAll(".menu-button");
 const menuItems = document.querySelectorAll(".menu-item");
 const hamburgerButton = document.getElementById("hamburger-button");
+const themeToggleButton = document.getElementById("theme-toggle-button");
 const appShell = document.querySelector(".app-shell");
 const sidePanel = document.getElementById("side-panel");
 const statusContainer = document.querySelector(".bottom-row");
@@ -10,6 +11,50 @@ const middleRow = document.getElementById("middle-row");
 const splitter = document.getElementById("splitter");
 const aceContainer = document.getElementById("ace-editor");
 const editorMeta = document.getElementById("editor-meta");
+
+// Light/dark theme: [data-theme] on <html> drives every colour in style.css
+// via CSS custom properties. Applied immediately (before the rest of the app
+// initialises) and persisted so the app reopens in the same theme.
+const THEME_STORAGE_KEY = "neo-theme";
+
+function applyTheme(theme) {
+  const resolved = theme === "dark" ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", resolved);
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, resolved);
+  } catch (error) {
+    // Ignore storage failures (e.g. disabled storage) - theme still applies
+    // for this session, it just won't persist across restarts.
+  }
+  if (themeToggleButton) {
+    const isDark = resolved === "dark";
+    themeToggleButton.setAttribute("aria-pressed", String(isDark));
+    themeToggleButton.setAttribute("aria-label", isDark ? "Switch to light theme" : "Switch to dark theme");
+    const icon = themeToggleButton.querySelector(".theme-toggle-icon");
+    if (icon) {
+      icon.textContent = isDark ? "☀" : "☾";
+    }
+  }
+}
+
+function initTheme() {
+  let stored = null;
+  try {
+    stored = localStorage.getItem(THEME_STORAGE_KEY);
+  } catch (error) {
+    stored = null;
+  }
+  applyTheme(stored === "dark" ? "dark" : "light");
+}
+
+if (themeToggleButton) {
+  themeToggleButton.addEventListener("click", () => {
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    applyTheme(isDark ? "light" : "dark");
+  });
+}
+
+initTheme();
 
 // Version of the bundled p5.js library (public/libs/p5-<version>.min.js).
 // Single source of truth for the default build the sketch iframe loads.
