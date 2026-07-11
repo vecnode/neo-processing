@@ -201,6 +201,35 @@ currently a single-file, non-persistent import (cleared on reload); treat it
 as a starting point, not the final design, if it needs to support multiple
 libraries or persistence later.
 
+### Sound (master audio on/off + volume)
+
+The **Sound** section (between Sketch and Libraries) gives master control
+over sketch audio output - muted by default. Design background in
+`docs/proposals/sound-section.md`; the doc's top now lists exactly where the
+implementation diverges from the original proposal.
+
+Rather than hook whatever audio API a sketch happens to use (raw Web Audio,
+p5.sound, an imported library), `buildAudioController(enabled, volume)` in
+`script.js` is injected into the sketch iframe (after `captureController`,
+before `importedLibrarySource`/the sketch code) and wraps
+`AudioContext`/`webkitAudioContext` once: each context gets a `GainNode`
+spliced in, and `destination` is shadowed as an *own property* on that
+instance so anything the sketch connects to `ctx.destination` lands on the
+gain node instead of real output. The parent posts `{ type: 'audio-set',
+enabled, volume }` on toggle/slider change (see `applyAudioState()`); the
+initial state is baked into the controller string per `runSketch()` call.
+
+No new capability crosses the sandbox boundary - the message payload is just
+a boolean and a 0-1 float, and the iframe stays `sandbox="allow-scripts"`
+with no `allow-same-origin`, same as everywhere else.
+
+Known limitations (also listed in the proposal doc): browser autoplay policy
+may require a click inside the sketch before audio actually starts; the
+`captureController`'s WebM recording is still video-only (no audio track);
+and if `p5.sound` is ever bundled, verify it doesn't grab its own
+`AudioContext` reference at load time (in `<head>`) before this controller
+(in `<body>`) gets a chance to patch `window.AudioContext`.
+
 ## Build & run
 
 Prerequisites: CMake ≥ 3.20, a C++20 compiler, Git (CMake `FetchContent`

@@ -651,6 +651,15 @@ let sketchBg = "#ffffff";
 let sketchAnchor = "center";
 const anchorButtons = document.querySelectorAll(".segmented-btn[data-anchor]");
 
+// Master audio on/off + volume for sketch output (see docs/proposals/sound-section.md).
+// Muted by default - a silent-by-default app is the safer default for
+// unattended/full-screen installs. Baked into the iframe when a sketch runs
+// and pushed live via postMessage when changed.
+let audioEnabled = false;
+let audioMasterVolume = 1;
+const audioToggleButtons = document.querySelectorAll(".segmented-btn[data-audio]");
+const audioMasterSlider = document.getElementById("audio-master-slider");
+
 function initializeEditor() {
   if (!aceContainer || typeof ace === "undefined") {
     return;
@@ -1071,6 +1080,50 @@ const captureController = `
 })();
 `;
 
+// Master audio on/off + volume, injected ahead of the sketch code (see
+// docs/proposals/sound-section.md). Rather than hook every possible audio API
+// a sketch might use (p5.sound, raw Web Audio, an imported library), this
+// wraps AudioContext/webkitAudioContext once: each context gets a gain node
+// spliced between it and the real output, and `destination` is shadowed on
+// the instance to point at that gain node - so anything the sketch connects
+// to `ctx.destination` (p5.sound's master bus included) lands on our gain
+// node instead. No new capability crosses the sandbox: the postMessage
+// payload is just a boolean and a 0-1 float, iframe stays
+// sandbox="allow-scripts" with no allow-same-origin, exactly as elsewhere.
+function buildAudioController(initialEnabled, initialVolume) {
+  return `
+(function () {
+  var masterGain = null;
+  var enabled = ${initialEnabled ? "true" : "false"};
+  var volume = ${JSON.stringify(typeof initialVolume === "number" ? initialVolume : 1)};
+  function applyGain() {
+    if (masterGain) masterGain.gain.value = enabled ? volume : 0;
+  }
+  var RealAC = window.AudioContext || window.webkitAudioContext;
+  if (RealAC) {
+    var Patched = function () {
+      var ctx = Reflect.construct(RealAC, arguments);
+      masterGain = ctx.createGain();
+      masterGain.connect(ctx.destination);
+      applyGain();
+      Object.defineProperty(ctx, 'destination', { get: function () { return masterGain; } });
+      return ctx;
+    };
+    window.AudioContext = Patched;
+    window.webkitAudioContext = Patched;
+  }
+  window.addEventListener('message', function (event) {
+    var data = event.data || {};
+    if (data.type === 'audio-set') {
+      if (typeof data.enabled === 'boolean') enabled = data.enabled;
+      if (typeof data.volume === 'number') volume = data.volume;
+      applyGain();
+    }
+  });
+})();
+`;
+}
+
 function runSketch() {
   const code = getEditorContents();
   const rightPanel = document.querySelector(".right-panel");
@@ -1117,6 +1170,7 @@ function runSketch() {
       window.parent.postMessage({ type: 'sketch-error', message: msg + ' (line ' + line + ')' }, '*');
     };
     ${captureController}
+    ${buildAudioController(audioEnabled, audioMasterVolume)}
     ${importedLibrarySource}
     ${code}
   <\/script>
@@ -1362,6 +1416,44 @@ anchorButtons.forEach((button) => {
     applySketchAnchor(button.dataset.anchor);
   });
 });
+
+// Master audio on/off + volume: pushes live to a running sketch so the
+// mute/volume change takes effect immediately, no need to re-run.
+function applyAudioState() {
+  if (audioMasterSlider) {
+    audioMasterSlider.disabled = !audioEnabled;
+  }
+  if (sketchFrame && sketchFrame.contentWindow) {
+    sketchFrame.contentWindow.postMessage(
+      { type: "audio-set", enabled: audioEnabled, volume: audioMasterVolume },
+      "*"
+    );
+  }
+}
+
+audioToggleButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    audioToggleButtons.forEach((other) => {
+      const isActive = other === button;
+      other.classList.toggle("is-active", isActive);
+      other.setAttribute("aria-pressed", String(isActive));
+    });
+    audioEnabled = button.dataset.audio === "on";
+    applyAudioState();
+    appendStatus(`Sketch audio ${audioEnabled ? "on" : "off"}`);
+  });
+});
+
+if (audioMasterSlider) {
+  audioMasterSlider.disabled = !audioEnabled;
+  audioMasterSlider.addEventListener("input", (event) => {
+    audioMasterVolume = parseFloat(event.target.value);
+    if (Number.isNaN(audioMasterVolume)) {
+      audioMasterVolume = 1;
+    }
+    applyAudioState();
+  });
+}
 
 // Stop the running sketch: remove its iframe so it stops executing and
 // rendering entirely, and reset any capture state tied to it.

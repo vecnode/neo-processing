@@ -258,6 +258,24 @@ body {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+#audio-master-slider {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+#audio-master-slider:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#audio-master-slider:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-radius: var(--radius-sm);
+}
+
 .panel-hint {
   margin-top: 14px;
   font-size: 0.78rem;
