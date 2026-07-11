@@ -59,15 +59,28 @@ below). The default, bundled build keeps the app fully offline.
     in `script.js`'s `examples` object, keyed by the same label text as the
     `data-action` on each `<li>` button. Keep the two in sync when adding
     examples - a mismatched key silently no-ops (see `loadExample()`).
-  - `#tab-strip` (above the editor) - the layer tabs from
-    `docs/proposals/layer-system.md`, Phase 1: multi-session editing only.
-    Each tab is one `ace.EditSession` (own undo history/cursor/scroll) in the
+  - `#tab-strip` (above the editor) + `#layers-panel` (right half of the
+    bottom row) - the layer system from `docs/proposals/layer-system.md`,
+    Phases 1-2: multi-session editing *and* stacked/composited layers. Each
+    tab is one `ace.EditSession` (own undo history/cursor/scroll) in the
     `layers` array (`script.js`); `activateLayer()` swaps the session on the
-    single `aceEditor` instance. Only one iframe still ever runs (Run uses
-    whichever tab is active) - compositing multiple simultaneously-running
-    layers is a later phase, not yet built. Hard cap of 10 layers
+    single `aceEditor` instance. Each layer that's been Run gets its own
+    `sandbox="allow-scripts"` iframe, absolutely positioned and stacked in
+    `.right-panel` via inline `z-index` matching array order
+    (`applyLayerZIndex()`) - layer 0 isn't in the array at all, it's just
+    `.right-panel`'s own `background: var(--sketch-bg)`. Layer iframes have a
+    transparent CSS background so lower layers show through wherever a
+    sketch doesn't paint something opaque (the sketch's own responsibility -
+    see the proposal doc's compositing notes). Hard cap of 5 layers
     (`MAX_LAYERS`); at least one layer must always exist (`closeLayer()`
     refuses to close the last one). Double-click a tab label to rename.
+    Hiding a layer (`setLayerVisible()`) both removes it from the visual
+    stack and posts `layer-set-visible` to call `noLoop()`/`loop()` inside
+    it (`layerController`, injected like `captureController`), so a hidden
+    layer stops costing CPU, not just being invisible. Sound/Anchor stay
+    global broadcasts to every running layer, not per-layer (see the
+    proposal doc's "Decisions"). **Capture/Record still only capture the
+    active layer**, not the full composite - that's Phase 3, not built yet.
   - `libraries.json` - manifest of injectable p5.js builds (`{ id, name,
     version, url, isLocal }`); see the Libraries section below.
   - `script.js` - all UI logic: editor setup, menus, file open/save, panel

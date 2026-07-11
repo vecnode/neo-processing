@@ -21,7 +21,7 @@
             <button id="fullscreen-button" class="panel-button" type="button">Full Window</button>
             <button id="desktop-fullscreen-button" class="panel-button" type="button">Fullscreen</button>
           </div>
-          <p class="panel-hint" id="capture-hint">Run a sketch, then record video or capture a frame. Files are saved to <code>outputs/</code>.</p>
+          <p class="panel-hint" id="capture-hint">Run a sketch, then record video or capture a frame. Files are saved to <code>outputs/</code>. Currently captures the active layer only, not the full composite.</p>
         </section>
 
         <hr class="panel-separator">
@@ -164,8 +164,17 @@
       <div class="h-splitter" id="h-splitter" role="separator" aria-orientation="horizontal" aria-label="Resize terminal" tabindex="0"></div>
 
       <footer class="bottom-row">
-        <span class="status-label">>_</span>
-        <output id="terminal" aria-live="polite"></output>
+        <div class="terminal-column">
+          <span class="status-label">>_</span>
+          <output id="terminal" aria-live="polite"></output>
+        </div>
+        <div class="layers-column">
+          <div class="layers-column-header">
+            <span class="layers-column-title">Layers</span>
+            <button id="stop-all-layers-button" class="layers-stop-all-button" type="button">Stop All</button>
+          </div>
+          <div id="layers-panel" role="list" aria-label="Sketch layers"></div>
+        </div>
       </footer>
     </div>
   </div>
