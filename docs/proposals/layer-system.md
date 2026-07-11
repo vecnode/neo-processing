@@ -1,7 +1,8 @@
 # Proposal: multi-layer sketches (tabs + compositing)
 
 Status: **proposal only** - not implemented. This is a design for review, in
-the same spirit as `docs/proposals/sound-section.md`.
+the same spirit as `docs/proposals/sound-section.md`. The "Open questions"
+section below has been resolved (2026-07-11) - see "Decisions" at the end.
 
 ## Goal
 
@@ -10,10 +11,14 @@ Today the app runs exactly one sketch: one `<iframe>` in `.right-panel`, with
 compositing stack:
 
 - **Layer 0** - the existing background colour (`sketchBg`, Sketch panel's
-  colour picker). Not a sketch, just the base fill behind everything.
+  colour picker). Not a sketch - no code runs on it, no fixed size, it just
+  stretches to fill `.right-panel` (including fullscreen). It's the base
+  fill behind everything else.
 - **Layer 1..N** - one running sketch per layer, each its own tab in a new
   tab strip above the code editor, stacked in `.right-panel` in a chosen
-  order, composited together.
+  order, composited together. Each layer is sized to *its own* sketch's
+  `createCanvas()` call - no forced project-wide canvas size - defaulting to
+  400x400 if a layer's sketch never calls `createCanvas()`.
 
 UI changes requested:
 1. A tab bar above the Ace editor - one tab per layer/sketch.
@@ -65,10 +70,14 @@ everything below it within its own canvas bounds, same as any layered tool
 - maybe lint/hint on `background(` with no alpha in a non-layer-0 sketch (a
   nice-to-have, not required for v1).
 
-**Canvas size**: for stacking to align, every layer's `createCanvas()` should
-agree on one size. Proposing a project-level canvas size (surfaced in the
-Sketch panel, defaulting to today's implicit convention e.g. 400x400) rather
-than leaving it implicit - an open question below.
+**Canvas size**: each layer sizes itself to its own sketch's `createCanvas()`
+call (default 400x400 if unset) - no forced project-wide size. Layer 0 has
+no size of its own; it stretches to fill `.right-panel` (fullscreen-capable,
+same as today's `sketchBg` behaviour). Layers of differing sizes stack using
+the existing Sketch-panel anchor setting (Center/Top Left), same as today's
+single-sketch behaviour - a 300x300 layer and a 600x600 layer both anchor
+the same way, they just don't pixel-align edge-to-edge. That's an accepted
+tradeoff of not forcing one canvas size.
 
 ## Capture & recording rework (the biggest item)
 
@@ -137,20 +146,16 @@ add, not v1).
    it's just more instances of the same `sandbox="allow-scripts"` iframe
    pattern already in the app.
 
-## Open questions
+## Decisions (resolved 2026-07-11)
 
-- **Canvas size**: fixed project-wide default, or a control in the Sketch
-  panel? Leaning toward the latter (small width/height fields, defaulting to
-  400x400) so layers can actually align.
-- **Hidden layers**: pause their draw loop (recommended, caps CPU) or keep
-  running silently? Proposing pause via `postMessage`.
-- **Max layer count**: no hard cap initially, but N layers = N independent
-  `requestAnimationFrame` loops + N p5 instances - likely want a soft
-  warning past some count (e.g. 6-8) rather than a hard limit.
-- **Per-layer Libraries/Import JS Library**: global (one p5 build / one
-  imported library for all layers, matching today) for v1, or per-layer
-  later? Recommending global for v1 - simpler, and most layered-sketch use
-  cases share one p5 build anyway.
-- **Persistence**: should the tab/layer set survive an app restart? Out of
-  scope v1 - matches today's behaviour (nothing persists beyond explicit
-  File > Save to `outputs/`).
+- **Canvas size**: no project-wide size. Layer 0 stretches to fill
+  `.right-panel` (fullscreen-capable) and has no code/size of its own.
+  Layers 1..N each size to their own sketch's `createCanvas()`, defaulting
+  to 400x400 if unset.
+- **Hidden layers**: stop processing (pause the draw loop via `postMessage`,
+  not just CSS-hidden) - caps CPU cost as designed.
+- **Max layer count**: hard cap of **10** layers (layer 0 + up to 10 running
+  sketches).
+- **Per-layer Libraries/Import JS Library**: global for now, not per-layer.
+- **Persistence**: not for now - layers/tabs don't survive an app restart,
+  matching today's behaviour.
