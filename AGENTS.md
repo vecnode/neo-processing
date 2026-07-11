@@ -73,10 +73,13 @@ below). The default, bundled build keeps the app fully offline.
     `data-theme` on `<html>` and persists the choice to `localStorage`
     (`neo-theme`). Add new colours as `var(--token)` referencing a custom
     property, not a literal hex, so they pick up both themes automatically.
-    The vendored Ace "textmate" theme hardcodes its own light colours; dark
-    mode overrides just its base surface/text/gutter/selection via
-    `[data-theme="dark"] .ace-tm ...` rules and leaves syntax token colours
-    as-is (no dark Ace theme is vendored, to stay offline-first).
+    The vendored Ace "textmate" theme hardcodes light-only syntax colours
+    (plain blue keywords/numbers, which read poorly on a dark surface), so
+    `script.js` swaps the whole Ace theme with the app theme instead of
+    patching textmate's colours: `ACE_THEME_LIGHT` ("textmate") for light,
+    `ACE_THEME_DARK` ("tomorrow_night", vendored at
+    `public/libs/theme-tomorrow_night.js`, same `ace-builds` version as
+    `ace.js`) for dark, applied in `applyTheme()` and at editor init.
   - `libs/` - vendored third-party JS (Ace editor, p5.js). These are committed.
     The bundled p5 version is declared once as `P5_VERSION` in `script.js`, which
     drives both the version label and the `<script>` URL the sketch iframe loads;
