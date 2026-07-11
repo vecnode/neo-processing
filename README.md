@@ -46,6 +46,9 @@ sketch with the goal of real-world, full-screen deployment.
 
 - Full-screen rendering for deployed installations.
 - Exporting standalone, editor-free applications per sketch.
+- Multi-layer sketches (tabs + a compositing stack) - see
+  [docs/proposals/layer-system.md](./docs/proposals/layer-system.md) for the
+  design proposal (not yet implemented).
 
 ## Architecture
 
