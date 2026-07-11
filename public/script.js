@@ -681,7 +681,6 @@ function draw() {
 
 let isResizingPanels = false;
 let openFileInput = null;
-let sketchFrame = null;
 let isRecording = false;
 
 const recordButton = document.getElementById("record-button");
@@ -712,14 +711,18 @@ let audioMasterVolume = 1;
 const audioToggleButtons = document.querySelectorAll(".segmented-btn[data-audio]");
 const audioMasterSlider = document.getElementById("audio-master-slider");
 
-// Layers (see docs/proposals/layer-system.md). Phase 1: multi-session
-// editing only - one Ace EditSession per layer/tab, each keeping its own
-// undo history, cursor, and scroll position. Only one iframe still ever
-// runs at a time (today's single-sketch behaviour); which code Run uses is
-// just whichever tab is active. Compositing/multiple simultaneous running
-// layers is a later phase.
-const MAX_LAYERS = 10;
+// Layers (see docs/proposals/layer-system.md). Phase 1 (tabs, one
+// ace.EditSession per layer) + Phase 2 (stacking): layers 1..N are
+// independent, simultaneously-running iframes composited in .right-panel
+// via z-index (array order = stack order, index 0 at the bottom). Layer 0
+// isn't in this array at all - it's just the panel's own CSS background
+// (sketchBg/--sketch-bg), no code runs on it. Capture/Record are still
+// scoped to the active layer only (Phase 3 - compositing the capture/
+// recording pipeline itself - isn't built yet).
+const MAX_LAYERS = 5;
 const tabStrip = document.getElementById("tab-strip");
+const layersPanel = document.getElementById("layers-panel");
+const stopAllLayersButton = document.getElementById("stop-all-layers-button");
 let layers = [];
 let activeLayerId = null;
 let nextLayerNumber = 1;
@@ -729,6 +732,10 @@ function createLayerSession(code) {
   session.setTabSize(2);
   session.setUseSoftTabs(true);
   return session;
+}
+
+function activeLayer() {
+  return layers.find((l) => l.id === activeLayerId) || null;
 }
 
 // Creates a new layer (not activated - call activateLayer() to switch to it).
@@ -743,6 +750,8 @@ function addLayer(code) {
     id: `layer-${nextLayerNumber}-${Date.now()}`,
     name: `Layer ${nextLayerNumber}`,
     session: createLayerSession(code),
+    iframe: null, // the running <iframe>, or null while stopped
+    visible: true,
   };
   nextLayerNumber += 1;
   layers.push(layer);
@@ -759,12 +768,23 @@ function activateLayer(id) {
   aceEditor.setSession(layer.session);
   aceEditor.resize();
   aceEditor.focus();
-  renderTabStrip();
+  renderLayerUI();
 }
 
-// Closes a layer's tab (its Ace session and, later, its running iframe/
-// layer). Always keeps at least one layer - the last remaining tab can't be
-// closed.
+// Keeps every running layer's iframe z-index in sync with array order
+// (index 0 = bottom of the stack). Call after anything that adds, removes,
+// or reorders layers.
+function applyLayerZIndex() {
+  layers.forEach((layer, index) => {
+    if (layer.iframe) {
+      layer.iframe.style.zIndex = String(index + 1);
+    }
+  });
+}
+
+// Closes a layer's tab: stops its iframe (if running) and drops its Ace
+// session. Always keeps at least one layer - the last remaining tab can't
+// be closed.
 function closeLayer(id) {
   if (layers.length <= 1) {
     appendStatus("At least one layer is required");
@@ -776,14 +796,17 @@ function closeLayer(id) {
     return;
   }
 
-  const wasActive = id === activeLayerId;
-  layers.splice(index, 1);
+  const [closed] = layers.splice(index, 1);
+  if (closed.iframe) {
+    closed.iframe.remove();
+  }
+  applyLayerZIndex();
 
-  if (wasActive) {
+  if (closed.id === activeLayerId) {
     const next = layers[index] || layers[index - 1] || layers[0];
     activateLayer(next.id);
   } else {
-    renderTabStrip();
+    renderLayerUI();
   }
 }
 
@@ -793,7 +816,38 @@ function renameLayer(id, name) {
   if (layer && trimmed) {
     layer.name = trimmed;
   }
-  renderTabStrip();
+  renderLayerUI();
+}
+
+// Moves a layer up (-1) or down (+1) in stacking order and re-applies
+// z-index. No-op at either end of the array.
+function moveLayer(id, direction) {
+  const index = layers.findIndex((l) => l.id === id);
+  const target = index + direction;
+  if (index === -1 || target < 0 || target >= layers.length) {
+    return;
+  }
+
+  const [layer] = layers.splice(index, 1);
+  layers.splice(target, 0, layer);
+  applyLayerZIndex();
+  renderLayerUI();
+}
+
+// Shows/hides a layer. Hiding both removes it from the visual stack
+// (display:none) and tells its p5 instance to stop its draw loop
+// (noLoop()) via layerController, so a hidden layer costs no CPU - not
+// just visually absent. Only meaningful for a layer that's actually
+// running; the flag is still stored either way so a later Run respects it.
+function setLayerVisible(layer, visible) {
+  layer.visible = visible;
+  if (layer.iframe) {
+    layer.iframe.style.display = visible ? "block" : "none";
+    if (layer.iframe.contentWindow) {
+      layer.iframe.contentWindow.postMessage({ type: "layer-set-visible", visible }, "*");
+    }
+  }
+  renderLayerUI();
 }
 
 function renderTabStrip() {
@@ -865,6 +919,89 @@ function renderTabStrip() {
     }
   });
   tabStrip.appendChild(addButton);
+}
+
+// The Layers panel (right half of the bottom row): a static Layer 0 row for
+// the background colour, then one row per layer with its running status,
+// a Hide/Show toggle, Stop, and Up/Down reorder buttons.
+function renderLayersPanel() {
+  if (!layersPanel) {
+    return;
+  }
+
+  layersPanel.innerHTML = "";
+
+  const baseRow = document.createElement("div");
+  baseRow.className = "layer-row is-base";
+  baseRow.setAttribute("role", "listitem");
+  const baseSwatch = document.createElement("span");
+  baseSwatch.className = "layer-swatch";
+  baseSwatch.style.background = sketchBg;
+  const baseName = document.createElement("span");
+  baseName.className = "layer-row-name";
+  baseName.textContent = "Layer 0 · Background";
+  baseRow.appendChild(baseSwatch);
+  baseRow.appendChild(baseName);
+  layersPanel.appendChild(baseRow);
+
+  layers.forEach((layer, index) => {
+    const row = document.createElement("div");
+    row.className = "layer-row" + (layer.id === activeLayerId ? " is-active-layer" : "");
+    row.setAttribute("role", "listitem");
+
+    const name = document.createElement("span");
+    name.className = "layer-row-name";
+    name.textContent = layer.name;
+    name.title = layer.name;
+    name.addEventListener("click", () => activateLayer(layer.id));
+
+    const status = document.createElement("span");
+    status.className = "layer-row-status";
+    status.textContent = !layer.iframe ? "Stopped" : layer.visible ? "Running" : "Hidden";
+
+    const upButton = document.createElement("button");
+    upButton.type = "button";
+    upButton.className = "layer-row-button";
+    upButton.textContent = "↑";
+    upButton.setAttribute("aria-label", `Move ${layer.name} up`);
+    upButton.disabled = index === 0;
+    upButton.addEventListener("click", () => moveLayer(layer.id, -1));
+
+    const downButton = document.createElement("button");
+    downButton.type = "button";
+    downButton.className = "layer-row-button";
+    downButton.textContent = "↓";
+    downButton.setAttribute("aria-label", `Move ${layer.name} down`);
+    downButton.disabled = index === layers.length - 1;
+    downButton.addEventListener("click", () => moveLayer(layer.id, 1));
+
+    const visibilityButton = document.createElement("button");
+    visibilityButton.type = "button";
+    visibilityButton.className = "layer-row-button";
+    visibilityButton.textContent = layer.visible ? "Hide" : "Show";
+    visibilityButton.disabled = !layer.iframe;
+    visibilityButton.addEventListener("click", () => setLayerVisible(layer, !layer.visible));
+
+    const stopRowButton = document.createElement("button");
+    stopRowButton.type = "button";
+    stopRowButton.className = "layer-row-button";
+    stopRowButton.textContent = "Stop";
+    stopRowButton.disabled = !layer.iframe;
+    stopRowButton.addEventListener("click", () => stopLayer(layer));
+
+    row.appendChild(name);
+    row.appendChild(status);
+    row.appendChild(upButton);
+    row.appendChild(downButton);
+    row.appendChild(visibilityButton);
+    row.appendChild(stopRowButton);
+    layersPanel.appendChild(row);
+  });
+}
+
+function renderLayerUI() {
+  renderTabStrip();
+  renderLayersPanel();
 }
 
 function initializeEditor() {
@@ -944,7 +1081,7 @@ function loadExample(name) {
 
   setEditorContents(code);
   appendStatus(`Loaded example: ${name}`);
-  runSketch();
+  runActiveLayer();
 }
 
 // Updates the label under the editor to show which p5.js build is active.
@@ -1005,13 +1142,10 @@ function applyLibrary() {
 
   setLibraryLabel();
   appendStatus(`Library set to ${activeLibrary.name}`);
-
-  if (sketchFrame) {
-    runSketch();
-  }
+  rerunAllRunningLayers();
 }
 
-// Reads a locally-picked .js file and stashes its source so runSketch() injects
+// Reads a locally-picked .js file and stashes its source so runLayer() injects
 // it into the sketch iframe (after p5.js, before the sketch code). Runs inside
 // the same sandboxed, opaque-origin iframe as the sketch itself, so this is no
 // broader a capability than the sketch code the user already writes there.
@@ -1029,9 +1163,7 @@ function importLibraryFile() {
       importLibraryHint.textContent = `Imported: ${importedLibraryName}`;
     }
     appendStatus(`Imported library: ${importedLibraryName}`);
-    if (sketchFrame) {
-      runSketch();
-    }
+    rerunAllRunningLayers();
   };
   reader.onerror = () => {
     appendStatus(`Could not read ${file.name}: ${reader.error}`);
@@ -1274,8 +1406,6 @@ const captureController = `
     } else if (data.type === 'record-stop') {
       recording = false;
       if (recorder && recorder.state !== 'inactive') recorder.stop();
-    } else if (data.type === 'set-bg') {
-      document.body.style.background = data.color;
     } else if (data.type === 'set-anchor') {
       var a = data.anchor === 'center' ? 'center' : 'flex-start';
       document.body.style.alignItems = a;
@@ -1329,24 +1459,49 @@ function buildAudioController(initialEnabled, initialVolume) {
 `;
 }
 
-function runSketch() {
-  const code = getEditorContents();
+// Lets the parent pause/resume a layer's draw loop (see setLayerVisible()) -
+// hiding a layer both removes it from the visual stack and stops it costing
+// CPU, rather than just being invisible while still rendering every frame.
+const layerController = `
+(function () {
+  window.addEventListener('message', function (event) {
+    var data = event.data || {};
+    if (data.type === 'layer-set-visible') {
+      if (data.visible) {
+        if (typeof loop === 'function') loop();
+      } else {
+        if (typeof noLoop === 'function') noLoop();
+      }
+    }
+  });
+})();
+`;
+
+// Runs (or re-runs) one layer's sketch in its own iframe, stacked in
+// .right-panel via z-index (see applyLayerZIndex()). Each layer's iframe
+// has a transparent background so layers below it can show through -
+// layer.session's own code is responsible for actually leaving parts
+// transparent (see docs/proposals/layer-system.md's compositing notes).
+function runLayer(layer) {
   const rightPanel = document.querySelector(".right-panel");
   if (!rightPanel) {
     appendStatus("Error: render panel not found");
     return;
   }
 
-  appendStatus("Running sketch...");
-  resetRecordingState();
-
-  const existingFrame = rightPanel.querySelector("iframe");
-  if (existingFrame) {
-    existingFrame.remove();
+  appendStatus(`Running ${layer.name}...`);
+  if (layer.id === activeLayerId) {
+    resetRecordingState();
   }
 
+  if (layer.iframe) {
+    layer.iframe.remove();
+    layer.iframe = null;
+  }
+
+  const code = layer.session.getValue();
   const iframe = document.createElement("iframe");
-  iframe.style.cssText = `width:100%;height:100%;border:none;background:${sketchBg};`;
+  iframe.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;border:none;background:transparent;";
   // Run user sketches in an opaque origin: scripts are permitted, but the
   // sketch cannot reach the parent document, cookies, storage, or the local
   // HTTP API. (allow-same-origin is deliberately omitted.)
@@ -1361,7 +1516,7 @@ function runSketch() {
     body {
       margin: 0;
       overflow: hidden;
-      background: ${sketchBg};
+      background: transparent;
       display: flex;
       align-items: ${sketchAnchor === "center" ? "center" : "flex-start"};
       justify-content: ${sketchAnchor === "center" ? "center" : "flex-start"};
@@ -1376,6 +1531,7 @@ function runSketch() {
     };
     ${captureController}
     ${buildAudioController(audioEnabled, audioMasterVolume)}
+    ${layerController}
     ${importedLibrarySource}
     ${code}
   <\/script>
@@ -1383,8 +1539,59 @@ function runSketch() {
 </html>`;
 
   iframe.srcdoc = html;
+  layer.visible = true;
   rightPanel.appendChild(iframe);
-  sketchFrame = iframe;
+  layer.iframe = iframe;
+  applyLayerZIndex();
+  renderLayerUI();
+}
+
+function runActiveLayer() {
+  const layer = activeLayer();
+  if (layer) {
+    runLayer(layer);
+  }
+}
+
+// Re-runs every currently-running layer - used when a global setting that's
+// baked into the iframe at run time changes (p5 build, imported library).
+function rerunAllRunningLayers() {
+  layers.filter((l) => l.iframe).forEach((l) => runLayer(l));
+}
+
+function stopLayer(layer) {
+  if (!layer.iframe) {
+    return;
+  }
+
+  layer.iframe.remove();
+  layer.iframe = null;
+  if (layer.id === activeLayerId) {
+    resetRecordingState();
+  }
+  renderLayerUI();
+}
+
+function stopActiveLayer() {
+  const layer = activeLayer();
+  if (!layer || !layer.iframe) {
+    appendStatus("No sketch running");
+    return;
+  }
+
+  stopLayer(layer);
+  appendStatus(`${layer.name} stopped`);
+}
+
+function stopAllLayers() {
+  const running = layers.filter((l) => l.iframe);
+  if (!running.length) {
+    appendStatus("No layers running");
+    return;
+  }
+
+  running.forEach((l) => stopLayer(l));
+  appendStatus("All layers stopped");
 }
 
 async function saveMedia(buffer, ext) {
@@ -1420,13 +1627,17 @@ function resetRecordingState() {
   setRecordingUI(false);
 }
 
+// Capture/Record target the active layer only - compositing the full
+// stack for capture/recording is a later phase (see
+// docs/proposals/layer-system.md).
 function postToSketch(message) {
-  if (!sketchFrame || !sketchFrame.contentWindow) {
+  const layer = activeLayer();
+  if (!layer || !layer.iframe || !layer.iframe.contentWindow) {
     appendStatus("Run a sketch first");
     return false;
   }
 
-  sketchFrame.contentWindow.postMessage(message, "*");
+  layer.iframe.contentWindow.postMessage(message, "*");
   return true;
 }
 
@@ -1461,7 +1672,7 @@ function toggleFullscreen() {
     return;
   }
 
-  if (!sketchFrame) {
+  if (!layers.some((l) => l.iframe)) {
     appendStatus("Run a sketch first");
     return;
   }
@@ -1493,7 +1704,7 @@ function toggleDesktopFullscreen() {
     return;
   }
 
-  if (!sketchFrame) {
+  if (!layers.some((l) => l.iframe)) {
     appendStatus("Run a sketch first");
     return;
   }
@@ -1584,15 +1795,14 @@ if (importLibraryButton && importLibraryInput) {
   importLibraryInput.addEventListener("change", importLibraryFile);
 }
 
-// Applies the chosen sketch background: stores it (baked into the next run),
-// updates the fullscreen letterbox colour, and pushes it live to a running
-// sketch so the change shows immediately.
+// Applies the chosen background colour - this *is* layer 0 (see
+// docs/proposals/layer-system.md), just a CSS custom property on
+// .right-panel itself, live immediately since no iframe needs to know
+// about it.
 function applySketchBg(color) {
   sketchBg = color;
   document.documentElement.style.setProperty("--sketch-bg", color);
-  if (sketchFrame && sketchFrame.contentWindow) {
-    sketchFrame.contentWindow.postMessage({ type: "set-bg", color }, "*");
-  }
+  renderLayersPanel();
 }
 
 if (sketchBgColor) {
@@ -1602,13 +1812,17 @@ if (sketchBgColor) {
   });
 }
 
-// Anchor switch: stores the choice (baked into the next run) and pushes it live
-// to a running sketch so the canvas repositions immediately.
+// Anchor switch: stores the choice (baked into the next run) and pushes it
+// live to every running layer so canvases reposition immediately. Global
+// across all layers, same as Sound and Libraries (see
+// docs/proposals/layer-system.md's "Decisions").
 function applySketchAnchor(anchor) {
   sketchAnchor = anchor;
-  if (sketchFrame && sketchFrame.contentWindow) {
-    sketchFrame.contentWindow.postMessage({ type: "set-anchor", anchor }, "*");
-  }
+  layers.forEach((layer) => {
+    if (layer.iframe && layer.iframe.contentWindow) {
+      layer.iframe.contentWindow.postMessage({ type: "set-anchor", anchor }, "*");
+    }
+  });
 }
 
 anchorButtons.forEach((button) => {
@@ -1622,18 +1836,21 @@ anchorButtons.forEach((button) => {
   });
 });
 
-// Master audio on/off + volume: pushes live to a running sketch so the
-// mute/volume change takes effect immediately, no need to re-run.
+// Master audio on/off + volume: pushes live to every running layer so the
+// mute/volume change takes effect immediately, no need to re-run. Global
+// across all layers, not per-layer, for now.
 function applyAudioState() {
   if (audioMasterSlider) {
     audioMasterSlider.disabled = !audioEnabled;
   }
-  if (sketchFrame && sketchFrame.contentWindow) {
-    sketchFrame.contentWindow.postMessage(
-      { type: "audio-set", enabled: audioEnabled, volume: audioMasterVolume },
-      "*"
-    );
-  }
+  layers.forEach((layer) => {
+    if (layer.iframe && layer.iframe.contentWindow) {
+      layer.iframe.contentWindow.postMessage(
+        { type: "audio-set", enabled: audioEnabled, volume: audioMasterVolume },
+        "*"
+      );
+    }
+  });
 }
 
 audioToggleButtons.forEach((button) => {
@@ -1660,26 +1877,10 @@ if (audioMasterSlider) {
   });
 }
 
-// Stop the running sketch: remove its iframe so it stops executing and
-// rendering entirely, and reset any capture state tied to it.
-function stopSketch() {
-  const rightPanel = document.querySelector(".right-panel");
-  const frame = rightPanel && rightPanel.querySelector("iframe");
-  if (!frame) {
-    appendStatus("No sketch running");
-    return;
-  }
-
-  frame.remove();
-  sketchFrame = null;
-  resetRecordingState();
-  appendStatus("Sketch stopped");
-}
-
 const runButton = document.getElementById("run-button");
 if (runButton) {
   runButton.addEventListener("click", (event) => {
-    runSketch();
+    runActiveLayer();
     event.stopPropagation();
   });
 }
@@ -1687,9 +1888,13 @@ if (runButton) {
 const stopButton = document.getElementById("stop-button");
 if (stopButton) {
   stopButton.addEventListener("click", (event) => {
-    stopSketch();
+    stopActiveLayer();
     event.stopPropagation();
   });
+}
+
+if (stopAllLayersButton) {
+  stopAllLayersButton.addEventListener("click", stopAllLayers);
 }
 
 if (hamburgerButton) {

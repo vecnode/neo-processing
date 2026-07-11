@@ -1,8 +1,11 @@
 # Proposal: multi-layer sketches (tabs + compositing)
 
-Status: **Phase 1 implemented** (2026-07-11) - multi-session tabs, no
-compositing yet. Phases 2-5 (stacking, capture/record rework, polish, sound
-broadcast) are still proposal-only. The "Open questions" section below has
+Status: **Phases 1-2 implemented** (2026-07-11) - multi-session tabs, and
+stacked/composited layers (visibility, reorder, hidden layers actually
+pausing). Phases 3-5 (capture/record compositing rework, polish, sound
+broadcast) are still proposal-only - note Sound/Anchor broadcasts actually
+landed early, as part of Phase 2, since per-layer running state required
+touching those call sites anyway. The "Open questions" section below has
 been resolved - see "Decisions" at the end.
 
 ## Goal
@@ -104,10 +107,9 @@ scoped as its own phase below.
 
 ## Sound
 
-`applyAudioState()` currently posts to one `sketchFrame`. Change to iterate
-all layer iframes and post to each - master on/off + volume stays a single
-global control across all layers (per-layer volume is a possible future
-add, not v1).
+**Done.** `applyAudioState()` iterates all layer iframes and posts to each -
+master on/off + volume stays a single global control across all layers
+(per-layer volume is a possible future add, not v1).
 
 ## Run/Stop semantics
 
@@ -132,20 +134,26 @@ add, not v1).
    tabs. Only the active tab's layer renders (today's single-iframe
    behaviour, just switchable) - proves the editor-side data model before
    touching `.right-panel`.
-2. **Stacking + visibility/reorder.** Multiple iframes composited via CSS
-   z-index; Layers panel controls visibility/order. Capture/Record
-   temporarily scoped to "active layer only" with a clear, documented
-   limitation.
+2. **✅ Stacking + visibility/reorder (done).** Multiple iframes composited
+   via CSS z-index; Layers panel controls visibility/order (Up/Down buttons,
+   not drag-and-drop - see the note under Phase 4). Hidden layers pause via
+   `noLoop()`/`loop()` (verified: a self-reporting test sketch went from 15
+   frames/300ms to 0 new frames after hiding, back to 18 frames/300ms after
+   showing again). Capture/Record scoped to "active layer only", documented
+   in the Capture panel's hint text and here.
 3. **Capture/record compositing rework.** The `capture-frame` protocol above;
    Capture PNG and Record both operate on the full composite.
 4. **Polish.** Per-layer opacity (cheap - CSS `opacity` on the iframe
-   wrapper, no canvas work needed), drag-to-reorder UX, hidden layers
-   actually pausing (`postMessage` pause/resume to their `captureController`
-   loop) rather than just being CSS-hidden, to cap CPU cost.
-5. **Sound broadcast + docs.** Multi-layer audio, `AGENTS.md` updates, and a
-   security-review note - no new capability crosses the sandbox boundary,
-   it's just more instances of the same `sandbox="allow-scripts"` iframe
-   pattern already in the app.
+   wrapper, no canvas work needed). Real drag-and-drop reordering, if the
+   Up/Down buttons from Phase 2 turn out not to be enough - they were chosen
+   over HTML5 drag-and-drop for lower implementation risk, not because
+   drag-and-drop was ruled out.
+5. **✅ Sound broadcast (done, landed early with Phase 2).** `AGENTS.md`
+   updated. Security-review note: no new capability crosses the sandbox
+   boundary - it's just more instances of the same `sandbox="allow-scripts"`
+   iframe pattern already in the app, and the postMessage payloads
+   (`layer-set-visible`, `audio-set`, `set-anchor`) are all booleans/floats/
+   fixed strings, same shape as before.
 
 ## Decisions (resolved 2026-07-11)
 
@@ -155,8 +163,9 @@ add, not v1).
   to 400x400 if unset.
 - **Hidden layers**: stop processing (pause the draw loop via `postMessage`,
   not just CSS-hidden) - caps CPU cost as designed.
-- **Max layer count**: hard cap of **10** layers (layer 0 + up to 10 running
-  sketches).
+- **Max layer count**: hard cap of **5** layers (layer 0 + up to 5 running
+  sketches). Lowered from an initial 10 (2026-07-11) - can be raised later
+  once compositing/perf is proven out.
 - **Per-layer Libraries/Import JS Library**: global for now, not per-layer.
 - **Persistence**: not for now - layers/tabs don't survive an app restart,
   matching today's behaviour.

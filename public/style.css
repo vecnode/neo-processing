@@ -305,8 +305,7 @@ body {
 }
 
 .top-row,
-.middle-row,
-.bottom-row {
+.middle-row {
   padding: 8px 10px;
 }
 
@@ -448,21 +447,24 @@ body {
   letter-spacing: 0.02em;
 }
 
+/* Layer 0 (see docs/proposals/layer-system.md): the panel's own background
+   *is* the base layer - no code runs on it, it just stretches to fill the
+   panel (including fullscreen). Layers 1..N are absolutely-positioned
+   iframes stacked on top via z-index (set inline per layer, see
+   applyLayerZIndex() in script.js), each with a transparent CSS background
+   so lower layers can show through wherever a sketch doesn't paint
+   something opaque. */
 .right-panel {
+  position: relative;
   overflow: hidden;
   padding: 10px;
-}
-
-/* Fullscreen preview: white backdrop, no padding — the sketch iframe centres
-   its own canvas, so it sits at exact size in the middle of the screen. */
-.right-panel:fullscreen {
-  padding: 0;
   background: var(--sketch-bg, #ffffff);
 }
 
-.right-panel:fullscreen iframe {
-  width: 100%;
-  height: 100%;
+/* Fullscreen preview: no padding - each layer iframe already fills the
+   panel exactly (position:absolute, 100%x100%, set inline). */
+.right-panel:fullscreen {
+  padding: 0;
 }
 
 /* The sketch render fills its panel with square corners — no radius, so the
@@ -616,14 +618,16 @@ body {
 }
 
 .side-panel,
-.bottom-row,
+.terminal-column,
+.layers-column,
 .menu-list {
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
 }
 
 .side-panel::-webkit-scrollbar,
-.bottom-row::-webkit-scrollbar,
+.terminal-column::-webkit-scrollbar,
+.layers-column::-webkit-scrollbar,
 .menu-list::-webkit-scrollbar,
 .middle-panel::-webkit-scrollbar,
 body::-webkit-scrollbar {
@@ -632,7 +636,8 @@ body::-webkit-scrollbar {
 }
 
 .side-panel::-webkit-scrollbar-track,
-.bottom-row::-webkit-scrollbar-track,
+.terminal-column::-webkit-scrollbar-track,
+.layers-column::-webkit-scrollbar-track,
 .menu-list::-webkit-scrollbar-track,
 .middle-panel::-webkit-scrollbar-track,
 body::-webkit-scrollbar-track {
@@ -640,7 +645,8 @@ body::-webkit-scrollbar-track {
 }
 
 .side-panel::-webkit-scrollbar-thumb,
-.bottom-row::-webkit-scrollbar-thumb,
+.terminal-column::-webkit-scrollbar-thumb,
+.layers-column::-webkit-scrollbar-thumb,
 .menu-list::-webkit-scrollbar-thumb,
 .middle-panel::-webkit-scrollbar-thumb,
 body::-webkit-scrollbar-thumb {
@@ -651,7 +657,8 @@ body::-webkit-scrollbar-thumb {
 }
 
 .side-panel::-webkit-scrollbar-thumb:hover,
-.bottom-row::-webkit-scrollbar-thumb:hover,
+.terminal-column::-webkit-scrollbar-thumb:hover,
+.layers-column::-webkit-scrollbar-thumb:hover,
 .menu-list::-webkit-scrollbar-thumb:hover,
 .middle-panel::-webkit-scrollbar-thumb:hover,
 body::-webkit-scrollbar-thumb:hover {
@@ -832,10 +839,17 @@ body::-webkit-scrollbar-thumb:hover {
   min-height: 0;
   border-top: 1px solid var(--border);
   display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--terminal-bg);
+}
+
+.terminal-column {
+  min-height: 0;
+  min-width: 0;
+  display: grid;
   align-content: start;
   gap: 4px;
   padding: 8px 14px;
-  background: var(--terminal-bg);
   overflow-y: auto;
   font-family: ui-monospace, "Cascadia Code", "SF Mono", "Courier New", Courier, monospace;
 }
@@ -854,6 +868,122 @@ body::-webkit-scrollbar-thumb:hover {
   font-weight: 400;
   line-height: 1.3;
   white-space: pre-line;
+}
+
+.layers-column {
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+.layers-column-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px 4px;
+  position: sticky;
+  top: 0;
+  background: var(--terminal-bg);
+}
+
+.layers-column-title {
+  color: var(--terminal-text);
+  font-weight: 600;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.layers-stop-all-button {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--terminal-text);
+  font-size: 0.7rem;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.layers-stop-all-button:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+#layers-panel {
+  flex: 1 1 auto;
+  padding: 0 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.layer-row {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  color: var(--terminal-text);
+}
+
+.layer-row.is-base {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.layer-row.is-active-layer {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.layer-swatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid var(--border-strong);
+}
+
+.layer-row-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.layer-row-status {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  color: var(--muted);
+  min-width: 40px;
+}
+
+.layer-row-button {
+  flex: 0 0 auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 3px 5px;
+  cursor: pointer;
+}
+
+.layer-row-button:hover {
+  border-color: var(--accent);
+}
+
+.layer-row-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 @media (max-width: 720px) {
