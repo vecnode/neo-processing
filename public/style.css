@@ -365,42 +365,19 @@ body {
   min-height: 0;
 }
 
-/* Keep the embedded Ace editor visually aligned with the warm surface. */
+/* Keep the embedded Ace editor visually aligned with the warm surface. This
+   also happens to closely match the dark theme's own tomorrow_night
+   background (#1D1F21 vs our --editor-bg dark value #1e1c19), so it stays
+   consistent with the rest of the dark chrome without fighting the theme. */
 .code-editor.ace_editor {
   background: var(--editor-bg);
 }
 
-/* The vendored Ace "textmate" theme (public/libs/theme-textmate-css.js) hard-
-   codes light colours on .ace-tm and its descendants - there's no bundled
-   dark Ace theme (offline-first: we don't fetch one). Override just the base
-   surface/text/gutter/selection colours for dark mode; syntax token colours
-   (keyword/string/comment/constant) are left as the vendored theme's - they're
-   saturated enough to stay legible on a dark background. */
-[data-theme="dark"] .ace-tm {
-  background-color: var(--editor-bg);
-  color: var(--text);
-}
-
-[data-theme="dark"] .ace-tm .ace_gutter {
-  background: var(--panel);
-  color: var(--muted);
-}
-
-[data-theme="dark"] .ace-tm .ace_print-margin {
-  background: var(--border);
-}
-
-[data-theme="dark"] .ace-tm .ace_cursor {
-  color: var(--text);
-}
-
-[data-theme="dark"] .ace-tm .ace_marker-layer .ace_active-line {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-[data-theme="dark"] .ace-tm .ace_marker-layer .ace_selection {
-  background: rgba(37, 99, 235, 0.35);
-}
+/* script.js swaps the Ace theme itself between light ("textmate", vendored
+   light-only colours) and dark ("tomorrow_night", vendored separately for
+   proper dark contrast - see ACE_THEME_LIGHT/ACE_THEME_DARK) rather than
+   patching one theme's colours for both backgrounds - textmate's hardcoded
+   plain-blue keywords/numbers read poorly on a dark surface. */
 
 .middle-panel h2 {
   margin: 0;

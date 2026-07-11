@@ -12,10 +12,22 @@ const splitter = document.getElementById("splitter");
 const aceContainer = document.getElementById("ace-editor");
 const editorMeta = document.getElementById("editor-meta");
 
+// Declared here (rather than down with the other editor state) so applyTheme()
+// below can reference it immediately at load time without a temporal-dead-zone
+// error - aceEditor is assigned once initializeEditor() runs, but is safe to
+// read (as null) before that.
+let aceEditor = null;
+
 // Light/dark theme: [data-theme] on <html> drives every colour in style.css
 // via CSS custom properties. Applied immediately (before the rest of the app
 // initialises) and persisted so the app reopens in the same theme.
 const THEME_STORAGE_KEY = "neo-theme";
+const ACE_THEME_LIGHT = "ace/theme/textmate";
+// The vendored "textmate" theme's hardcoded syntax colours (plain blue
+// keywords/numbers) read poorly on a dark background, so dark mode uses a
+// second vendored theme actually designed for dark backgrounds instead of
+// patching textmate's token colours.
+const ACE_THEME_DARK = "ace/theme/tomorrow_night";
 
 function applyTheme(theme) {
   const resolved = theme === "dark" ? "dark" : "light";
@@ -34,6 +46,9 @@ function applyTheme(theme) {
     if (icon) {
       icon.textContent = isDark ? "☀" : "☾";
     }
+  }
+  if (aceEditor) {
+    aceEditor.setTheme(resolved === "dark" ? ACE_THEME_DARK : ACE_THEME_LIGHT);
   }
 }
 
@@ -613,7 +628,6 @@ function draw() {
 };
 
 let isResizingPanels = false;
-let aceEditor = null;
 let openFileInput = null;
 let sketchFrame = null;
 let isRecording = false;
@@ -643,7 +657,7 @@ function initializeEditor() {
   }
 
   aceEditor = ace.edit("ace-editor");
-  aceEditor.setTheme("ace/theme/textmate");
+  aceEditor.setTheme(document.documentElement.getAttribute("data-theme") === "dark" ? ACE_THEME_DARK : ACE_THEME_LIGHT);
   aceEditor.session.setMode("ace/mode/javascript");
   aceEditor.session.setTabSize(2);
   aceEditor.session.setUseSoftTabs(true);
