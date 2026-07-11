@@ -50,9 +50,15 @@ below). The default, bundled build keeps the app fully offline.
     Capture section (Record / Capture PNG / Full Window / Fullscreen), a Sketch
     section (canvas anchor toggle - Center/Top Left - and a background-colour
     picker for the area behind the canvas), and a Libraries section (p5.js build
-    picker). Stop tears down the sketch iframe; the
+    picker + Import JS Library). Stop tears down the sketch iframe; the
     `.splitter` resizes the editor/preview split and `.h-splitter` the terminal
-    height (both drive CSS custom properties on the grid).
+    height (both drive CSS custom properties on the grid). The Examples menu
+    (`#examples-menu`) is grouped into five topics of five sketches each
+    (Motion & Physics, Shapes & Geometry, Waves & Noise, Particles & Systems,
+    Color & Pattern) via `.menu-section-label` headers; the sketch source lives
+    in `script.js`'s `examples` object, keyed by the same label text as the
+    `data-action` on each `<li>` button. Keep the two in sync when adding
+    examples - a mismatched key silently no-ops (see `loadExample()`).
   - `libraries.json` - manifest of injectable p5.js builds (`{ id, name,
     version, url, isLocal }`); see the Libraries section below.
   - `script.js` - all UI logic: editor setup, menus, file open/save, panel
