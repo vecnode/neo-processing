@@ -1,5 +1,9 @@
 # neo-processing
 
+[![Build & release](https://github.com/vecnode/neo-processing/actions/workflows/build.yml/badge.svg)](https://github.com/vecnode/neo-processing/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Language: C++20](https://img.shields.io/badge/language-C%2B%2B20-00599C.svg)](./CMakeLists.txt)
+
 > A native desktop editor and live runtime for [p5.js](https://p5js.org/)
 > sketches - a modern, JavaScript-based alternative to the Java Processing IDE.
 
