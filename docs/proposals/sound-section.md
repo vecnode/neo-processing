@@ -1,7 +1,27 @@
 # Proposal: "Sound" side-panel section
 
-Status: **proposal only** - not implemented. This is a design for review, in the
-same spirit as `AGENTS.md`'s existing sections on Capture/Libraries.
+Status: **implemented**, largely as designed below. Differences from the
+original proposal:
+
+- Segmented control uses `data-audio="on"/"off"` (not a separate toggle
+  component) and lives in `public/index.html`'s `#side-panel`, between Sketch
+  and Libraries - matching the anchor toggle's existing pattern.
+- The injected controller is `buildAudioController(enabled, volume)` in
+  `public/script.js` (a function, not a static template string like
+  `captureController`, since the initial gain needs to be baked in per run).
+  The postMessage type is `audio-set` with `{ enabled, volume }` in one
+  message rather than two separate types.
+- Uses `Reflect.construct(RealAC, arguments)` to forward constructor
+  arguments to the real `AudioContext`, then shadows `destination` as an
+  *own property* on that instance (not the prototype) - this avoids ever
+  needing to redefine a possibly non-configurable prototype accessor.
+- The open questions below (autoplay policy, recording integration, volume
+  curve, WebKitGTK coverage) are unresolved - this was a v1, not a final
+  design. In particular, if `p5.sound` is ever bundled, note that it may
+  capture its own `AudioContext` reference when it first loads (before the
+  controller has a chance to patch `window.AudioContext`, since the library
+  `<script>` tag is in `<head>` and this controller runs later, in `<body>`)
+  - unverified until p5.sound is actually used with this.
 
 ## Problem
 

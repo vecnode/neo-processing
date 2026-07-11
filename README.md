@@ -32,14 +32,17 @@ full-screen deployment.
   `outputs/`.
 - **Import JS Library** - load a local `.js` file (Libraries panel) into the
   sketch iframe alongside p5.js, for libraries outside the built-in manifest.
+- **Sound panel** - master on/off + a 0-1 volume slider over sketch audio
+  output (muted by default). See
+  [docs/proposals/sound-section.md](./docs/proposals/sound-section.md) for the
+  design (a wrapped `AudioContext.destination`, so it works with p5.sound,
+  raw Web Audio, or an imported library).
+- **Light/dark theme** - toggle in the top bar; persists across restarts.
 
 ### Roadmap
 
 - Full-screen rendering for deployed installations.
 - Exporting standalone, editor-free applications per sketch.
-- A "Sound" panel section for master on/off + volume control over sketch
-  audio output - see [docs/proposals/sound-section.md](./docs/proposals/sound-section.md)
-  for the design proposal (not yet implemented).
 
 ## Architecture
 
