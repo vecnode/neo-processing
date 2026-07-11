@@ -21,7 +21,6 @@
             <button id="fullscreen-button" class="panel-button" type="button">Full Window</button>
             <button id="desktop-fullscreen-button" class="panel-button" type="button">Fullscreen</button>
           </div>
-          <p class="panel-hint" id="capture-hint">Run a sketch, then record video or capture a frame. Captures the full composite of all visible layers. Files are saved to <code>outputs/</code>.</p>
         </section>
 
         <hr class="panel-separator">
@@ -39,7 +38,6 @@
             <span class="sketch-bg-label">Background</span>
             <input type="color" id="sketch-bg-color" value="#ffffff" aria-label="Sketch background color">
           </div>
-          <p class="panel-hint">The colour behind the sketch canvas (the area around it).</p>
         </section>
 
         <hr class="panel-separator">
@@ -67,12 +65,11 @@
             <select id="library-select" class="panel-select" aria-label="p5.js library"></select>
             <button id="library-apply" class="panel-button" type="button">Apply</button>
           </div>
-          <p class="panel-hint">Choose a p5.js build to load into your sketches. Online builds require a connection.</p>
           <div class="panel-controls">
             <button id="import-library-button" class="panel-button" type="button">Import JS Library</button>
             <input type="file" id="import-library-input" accept=".js,text/javascript" hidden>
           </div>
-          <p class="panel-hint" id="import-library-hint">Load a local .js file into the sketch iframe alongside p5.js.</p>
+          <p class="panel-hint" id="import-library-hint"></p>
         </section>
       </div>
     </aside>

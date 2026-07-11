@@ -58,19 +58,12 @@ body {
   height: 100%;
   margin: 0;
   font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: 15px;
+  font-size: 12px;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
-}
-
-html {
-  /* App starts at 80% zoom so the editor/preview get more effective screen
-     space; a plain CSS zoom keeps every element (fonts, paddings, controls)
-     scaled together instead of hand-tuning individual sizes. */
-  zoom: 0.8;
 }
 
 body {
@@ -103,11 +96,11 @@ body {
 }
 
 .side-panel-inner {
-  padding: 20px;
+  padding: 16px;
 }
 
 .side-panel h2 {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -121,14 +114,14 @@ body {
 .panel-separator {
   border: none;
   border-top: 1px solid var(--border);
-  margin: 24px 0;
+  margin: 19px 0;
 }
 
 .panel-controls {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 14px;
+  gap: 6px;
+  margin-top: 11px;
 }
 
 .panel-select {
@@ -136,7 +129,7 @@ body {
   width: 100%;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  padding: 9px 10px;
+  padding: 7px 8px;
   font-size: 0.85rem;
   color: var(--text);
   background: var(--panel);
@@ -152,11 +145,11 @@ body {
 .panel-button {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  padding: 9px 12px;
+  padding: 7px 10px;
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--text);
@@ -205,8 +198,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-top: 14px;
+  gap: 8px;
+  margin-top: 11px;
 }
 
 .sketch-bg-label {
@@ -226,7 +219,7 @@ body {
   background: var(--panel);
   color: var(--text);
   font-size: 0.8rem;
-  padding: 6px 12px;
+  padding: 5px 10px;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
@@ -279,7 +272,7 @@ body {
 }
 
 .panel-hint {
-  margin-top: 14px;
+  margin-top: 11px;
   font-size: 0.78rem;
   line-height: 1.5;
   color: var(--muted);
@@ -306,7 +299,7 @@ body {
 
 .top-row,
 .middle-row {
-  padding: 8px 10px;
+  padding: 6px 8px;
 }
 
 .middle-row {
@@ -323,15 +316,15 @@ body {
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: 10px;
+  padding: 8px;
   background: var(--bg);
 }
 
 .left-panel {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px;
+  gap: 5px;
+  padding: 8px;
   overflow: hidden;
 }
 
@@ -339,7 +332,7 @@ body {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -350,10 +343,11 @@ body {
 
 .tab {
   flex: 0 0 auto;
+  height: 26px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 6px 5px 10px;
+  gap: 5px;
+  padding: 0 5px 0 8px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--panel);
@@ -409,6 +403,9 @@ body {
   flex: 0 0 auto;
   width: 26px;
   height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--panel);
@@ -440,7 +437,7 @@ body {
 
 .editor-meta {
   flex: 0 0 auto;
-  padding: 2px 4px;
+  padding: 2px 3px;
   font-size: 0.72rem;
   color: var(--muted);
   font-family: ui-monospace, "Cascadia Code", "SF Mono", "Courier New", monospace;
@@ -458,7 +455,7 @@ body {
 .right-panel {
   position: relative;
   overflow: hidden;
-  padding: 10px;
+  padding: 8px;
   background: var(--sketch-bg, #ffffff);
 }
 
@@ -541,8 +538,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: 6px;
+  padding: 8px 10px;
   /* Raise the whole header (and its dropdowns) above the editor below it, so
      open menus overlay the Ace editor instead of being painted under it. */
   position: relative;
@@ -552,7 +549,7 @@ body {
 .menu-bar {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .menu-group {
@@ -560,9 +557,12 @@ body {
 }
 
 .menu-button {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  padding: 6px 12px;
+  padding: 0 10px;
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--text);
@@ -594,6 +594,7 @@ body {
   border-color: var(--border-strong);
   font-weight: 700;
   min-width: 34px;
+  justify-content: center;
   text-align: center;
 }
 
@@ -609,7 +610,7 @@ body {
   left: 0;
   min-width: 168px;
   margin: 0;
-  padding: 6px;
+  padding: 5px;
   list-style: none;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -672,7 +673,7 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .menu-section-label {
-  padding: 8px 10px 4px;
+  padding: 6px 8px 3px;
   font-size: 0.68rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -681,16 +682,16 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .menu-section-label:not(:first-child) {
-  margin-top: 4px;
+  margin-top: 3px;
   border-top: 1px solid var(--border);
-  padding-top: 10px;
+  padding-top: 8px;
 }
 
 .menu-item {
   width: 100%;
   border: none;
   border-radius: var(--radius-sm);
-  padding: 8px 10px;
+  padding: 6px 8px;
   text-align: left;
   font-size: 0.875rem;
   color: var(--text);
@@ -707,12 +708,12 @@ body::-webkit-scrollbar-thumb:hover {
 .top-row-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .theme-toggle-button {
-  width: 38px;
-  height: 32px;
+  width: 34px;
+  height: 28px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--panel);
@@ -754,7 +755,7 @@ body::-webkit-scrollbar-thumb:hover {
   position: relative;
   width: 80%;
   height: 80%;
-  padding: 32px;
+  padding: 26px;
   background: var(--panel);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
@@ -763,7 +764,7 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .modal-dialog h2 {
-  margin: 0 0 16px;
+  margin: 0 0 13px;
 }
 
 .modal-dialog p {
@@ -802,12 +803,12 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .hamburger-button {
-  width: 38px;
-  height: 32px;
+  width: 34px;
+  height: 28px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--panel);
-  padding: 7px 8px;
+  padding: 5px 6px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -849,8 +850,8 @@ body::-webkit-scrollbar-thumb:hover {
   min-width: 0;
   display: grid;
   align-content: start;
-  gap: 4px;
-  padding: 8px 14px;
+  gap: 3px;
+  padding: 6px 11px;
   overflow-y: auto;
   font-family: ui-monospace, "Cascadia Code", "SF Mono", "Courier New", Courier, monospace;
 }
@@ -885,8 +886,8 @@ body::-webkit-scrollbar-thumb:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 8px 14px 4px;
+  gap: 6px;
+  padding: 6px 11px 3px;
   position: sticky;
   top: 0;
   background: var(--terminal-bg);
@@ -906,7 +907,7 @@ body::-webkit-scrollbar-thumb:hover {
   background: transparent;
   color: var(--terminal-text);
   font-size: 0.7rem;
-  padding: 3px 8px;
+  padding: 2px 6px;
   cursor: pointer;
 }
 
@@ -917,18 +918,18 @@ body::-webkit-scrollbar-thumb:hover {
 
 #layers-panel {
   flex: 1 1 auto;
-  padding: 0 10px 8px;
+  padding: 0 8px 6px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .layer-row {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 6px;
+  gap: 5px;
+  padding: 4px 5px;
   border-radius: var(--radius-sm);
   font-size: 0.78rem;
   color: var(--terminal-text);
@@ -973,7 +974,7 @@ body::-webkit-scrollbar-thumb:hover {
   color: inherit;
   font-size: 0.72rem;
   line-height: 1;
-  padding: 3px 5px;
+  padding: 2px 4px;
   cursor: pointer;
 }
 
@@ -996,7 +997,7 @@ body::-webkit-scrollbar-thumb:hover {
   }
 
   .top-row {
-    padding: 10px 12px;
+    padding: 8px 10px;
   }
 
   .middle-row {

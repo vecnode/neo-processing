@@ -94,10 +94,18 @@ below). The default, bundled build keeps the app fully offline.
     version, url, isLocal }`); see the Libraries section below.
   - `script.js` - all UI logic: editor setup, menus, file open/save, panel
     splitter, the sketch runner, and the capture/fullscreen controls.
-  - `style.css` - styling. The `html` element is set to `zoom: 0.8` so the app
-    starts at 80% of its natural size (more editor/preview space in the same
-    window); this scales fonts, paddings, and controls together instead of
-    tuning each dimension by hand. Every colour is a CSS custom property
+  - `style.css` - styling. The app is sized at roughly 80% of its original
+    scale via real values (root `font-size: 12px`, was `15px`; Ace editor
+    font `11px`, was `14px`; `padding`/`margin`/`gap` scaled ~0.8x
+    throughout), **not** CSS `zoom`. An earlier version used `html { zoom:
+    0.8 }`, but `zoom` puts child elements in a different coordinate space
+    from `getBoundingClientRect()` (which reports post-zoom/visual pixels)
+    - this broke the layer system's canvas-centring math, which mixes a
+    layer's real (pre-zoom) canvas size with `.right-panel`'s
+    `getBoundingClientRect()`. Don't reintroduce `zoom` on `html`/`body`
+    without accounting for that. Top-bar buttons (Run/Stop/File/Examples/
+    theme toggle/copyright/hamburger) all share an explicit `height: 28px`
+    so they align regardless of font metrics. Every colour is a CSS custom property
     defined in `:root` (light theme, default) with dark-theme overrides in
     `[data-theme="dark"]` - the top-row's theme toggle button
     (`#theme-toggle-button`, wired in `script.js`'s `applyTheme()`) just flips
