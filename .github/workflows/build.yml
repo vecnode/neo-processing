@@ -1,0 +1,77 @@
+name: Build distributables
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache CMake FetchContent dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: win-deps-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Configure
+        run: cmake -B build -A x64
+
+      - name: Build (Release)
+        run: cmake --build build --target neo-processing -j --config Release
+
+      - name: Locate Release output
+        id: locate
+        shell: bash
+        run: |
+          if [ -f "build/Release/neo-processing.exe" ]; then
+            echo "dir=build/Release" >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=build" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload distributable
+        uses: actions/upload-artifact@v4
+        with:
+          name: neo-processing-windows
+          path: ${{ steps.locate.outputs.dir }}
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake git libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Cache CMake FetchContent dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: linux-deps-${{ hashFiles('CMakeLists.txt') }}
+
+      - name: Configure
+        run: cmake -B build
+
+      - name: Build (Release)
+        run: cmake --build build --target neo-processing -j --config Release
+
+      - name: Assemble distributable
+        run: |
+          mkdir -p dist/icons
+          cp build/neo-processing dist/
+          cp icons/app_icon.ico icons/app_icon_small.ico dist/icons/
+
+      - name: Upload distributable
+        uses: actions/upload-artifact@v4
+        with:
+          name: neo-processing-linux
+          path: dist
+          if-no-files-found: error

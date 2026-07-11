@@ -1,0 +1,4 @@
+// Embeds the app icon as a Win32 PE resource so Explorer, the taskbar
+// shortcut, and Alt+Tab show it as the file icon of neo-processing.exe
+// (independent of the runtime icon loaded from icons/*.ico by main.cpp).
+IDI_APP_ICON ICON "app_icon.ico"

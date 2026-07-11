@@ -19,7 +19,9 @@ The whole product is a single C++ executable that:
    that local server (WebView2 on Windows, WebKitGTK on Linux).
 
 There is no separate backend process and no external network dependency at
-runtime.
+runtime — the only optional exception is choosing an online p5.js build from
+the Libraries panel, which loads that build from a CDN (see "Libraries"
+below). The default, bundled build keeps the app fully offline.
 
 ## Architecture
 
@@ -55,7 +57,10 @@ runtime.
     version, url, isLocal }`); see the Libraries section below.
   - `script.js` — all UI logic: editor setup, menus, file open/save, panel
     splitter, the sketch runner, and the capture/fullscreen controls.
-  - `style.css` — styling.
+  - `style.css` — styling. The `html` element is set to `zoom: 0.8` so the app
+    starts at 80% of its natural size (more editor/preview space in the same
+    window); this scales fonts, paddings, and controls together instead of
+    tuning each dimension by hand.
   - `libs/` — vendored third-party JS (Ace editor, p5.js). These are committed.
     The bundled p5 version is declared once as `P5_VERSION` in `script.js`, which
     drives both the version label and the `<script>` URL the sketch iframe loads;
@@ -63,8 +68,15 @@ runtime.
 - **`outputs/`** — where saved sketches are written at runtime
   (`POST /api/save-script`). Treated as scratch output; safe to clear.
 - **`icons/`** — `.ico` files copied next to the executable on Windows and loaded
-  at runtime for the window/taskbar icon.
+  at runtime for the window/taskbar icon (`app_icon.ico` large, `app_icon_small.ico`
+  small/title-bar). `icons/app.rc` is a Win32 resource script that embeds
+  `app_icon.ico` into the `.exe` itself at build time (Windows only), so
+  Explorer/Alt+Tab show it as the file's own icon — separate from, and in
+  addition to, the runtime `LoadImageW`/`WM_SETICON` calls in `main.cpp` that
+  set the *window* icon from the same files.
 - **`assets/`** — screenshots for the README only.
+- **`.github/workflows/build.yml`** — CI: builds Release distributables for
+  Windows and Linux on push/PR to `main`, uploaded as workflow artifacts.
 
 ### Request/response contract
 
@@ -182,7 +194,16 @@ cmake --build build --target neo-processing -j --config Debug
 
 `build_and_distribute.bat` (Windows) builds Release and copies the resulting
 `build\Release` folder (executable, icons, runtime DLLs) to
-`%USERPROFILE%\Desktop\neo-processing`.
+`%USERPROFILE%\Desktop\neo-processing`. The `.exe`'s own file icon is embedded
+by the CMake build itself (`icons/app.rc`, see above), so this script does not
+need a separate icon-injection step.
+
+### CI
+
+`.github/workflows/build.yml` builds Release distributables for Windows
+(MSVC) and Linux (GCC + GTK3/WebKit2GTK) on every push/PR to `main`, uploading
+each as a workflow artifact. There is no test suite to run in CI — it only
+verifies the project configures and builds cleanly on both platforms.
 
 ### Dependencies (fetched at configure time into `build/_deps/`)
 
