@@ -560,7 +560,7 @@ body {
   height: 28px;
   display: inline-flex;
   align-items: center;
-  border: 1px solid transparent;
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   padding: 0 10px;
   font-size: 0.875rem;
@@ -667,24 +667,50 @@ body::-webkit-scrollbar-thumb:hover {
   background: var(--muted);
 }
 
-.menu-list-scroll {
-  max-height: min(70vh, 480px);
-  overflow-y: auto;
+.menu-group-item {
+  position: relative;
 }
 
-.menu-section-label {
-  padding: 6px 8px 3px;
-  font-size: 0.68rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.menu-submenu-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  text-align: left;
+  font-size: 0.875rem;
+  color: var(--text);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.menu-submenu-toggle::after {
+  content: "\25B8";
   color: var(--muted);
+  font-size: 0.75rem;
 }
 
-.menu-section-label:not(:first-child) {
-  margin-top: 3px;
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
+.menu-submenu-toggle:hover,
+.menu-group-item:hover > .menu-submenu-toggle,
+.menu-group-item:focus-within > .menu-submenu-toggle {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+
+.submenu {
+  display: none;
+  position: absolute;
+  top: -6px;
+  left: calc(100% + 4px);
+}
+
+.menu-group-item:hover > .submenu,
+.menu-group-item:focus-within > .submenu {
+  display: block;
 }
 
 .menu-item {
