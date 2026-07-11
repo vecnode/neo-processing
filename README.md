@@ -1,7 +1,7 @@
 # neo-processing
 
 > A native desktop editor and live runtime for [p5.js](https://p5js.org/)
-> sketches — a modern, JavaScript-based alternative to the Java Processing IDE.
+> sketches - a modern, JavaScript-based alternative to the Java Processing IDE.
 
 ![neo-processing editor with a live sketch preview](./assets/img4.png)
 
@@ -10,32 +10,36 @@ editor and a live preview into a native desktop window, so you can write a p5.js
 sketch on the left and watch it run on the right, with the goal of real-world,
 full-screen deployment.
 
-> **Status:** v0.1.0 — active development. Interfaces and features may change.
+> **Status:** v0.1.0 - active development. Interfaces and features may change.
 
 ## Features
 
-- **Native desktop app** — one executable, no browser or Node.js runtime
+- **Native desktop app** - one executable, no browser or Node.js runtime
   required. Uses the OS webview (WebView2 on Windows, WebKitGTK on Linux).
-- **Embedded editor** — syntax-highlighting code editor ([Ace](https://ace.c9.io/))
+- **Embedded editor** - syntax-highlighting code editor ([Ace](https://ace.c9.io/))
   with a resizable split between source and preview.
-- **Live sketch preview** — run your sketch instantly in an isolated, sandboxed
+- **Live sketch preview** - run your sketch instantly in an isolated, sandboxed
   preview pane.
-- **Record & capture** — record the running canvas to WebM video or capture a
+- **Record & capture** - record the running canvas to WebM video or capture a
   PNG frame, both rendered at the sketch's declared size and saved to `outputs/`.
-- **Fullscreen preview** — present the sketch centred at its exact size on a
+- **Fullscreen preview** - present the sketch centred at its exact size on a
   white backdrop; press Esc to exit.
-- **Local-first & offline** — the frontend and the bundled p5.js build are
+- **Local-first & offline** - the frontend and the bundled p5.js build are
   embedded into the binary and served from a loopback HTTP server. No internet
   access is required to run the app, **unless** you opt into an online p5.js
   build from the Libraries panel, which loads that build from a CDN.
-- **Save to disk** — export the current sketch to a timestamped `.js` file under
+- **Save to disk** - export the current sketch to a timestamped `.js` file under
   `outputs/`.
+- **Import JS Library** - load a local `.js` file (Libraries panel) into the
+  sketch iframe alongside p5.js, for libraries outside the built-in manifest.
 
 ### Roadmap
 
 - Full-screen rendering for deployed installations.
 - Exporting standalone, editor-free applications per sketch.
-- Loading arbitrary additional JavaScript libraries.
+- A "Sound" panel section for master on/off + volume control over sketch
+  audio output - see [docs/proposals/sound-section.md](./docs/proposals/sound-section.md)
+  for the design proposal (not yet implemented).
 
 ## Architecture
 
@@ -62,8 +66,8 @@ For a deeper description of the codebase, see [AGENTS.md](./AGENTS.md).
 |------------------|-------|
 | CMake ≥ 3.20     | Build system. |
 | C++20 compiler   | Windows: Visual Studio 2022 Build Tools (MSVC). Linux: GCC or Clang. |
-| Git              | Required — CMake `FetchContent` downloads dependencies from Git. |
-| Internet access  | Needed on the **first** configure to download build dependencies (see below). Not needed at runtime — see "Local-first & offline" above. |
+| Git              | Required - CMake `FetchContent` downloads dependencies from Git. |
+| Internet access  | Needed on the **first** configure to download build dependencies (see below). Not needed at runtime - see "Local-first & offline" above. |
 
 **Windows runtime:** Microsoft Edge WebView2 Runtime.
 
@@ -93,10 +97,10 @@ Use `--config Debug` (and the `Debug` output folder) for a debug build.
 #### Helper scripts
 
 ```sh
-# Windows — initialises the MSVC environment, configures, builds Debug, and runs.
+# Windows - initialises the MSVC environment, configures, builds Debug, and runs.
 .\build_and_run.bat
 
-# Linux — configures, builds Debug, and runs.
+# Linux - configures, builds Debug, and runs.
 ./build_and_run.sh
 ```
 
@@ -104,15 +108,19 @@ To produce a distributable build, run `.\build_and_distribute.bat` (Windows): it
 builds Release and copies the `build\Release` folder (executable, icons, and any
 runtime DLLs) to `%USERPROFILE%\Desktop\neo-processing`. The Windows executable's
 own file icon (as shown in Explorer, the taskbar, and Alt+Tab) is embedded at
-build time from `icons/app_icon.ico` via `icons/app.rc` — no separate
+build time from `icons/app_icon.ico` via `icons/app.rc` - no separate
 post-processing step is needed.
 
-### Continuous integration
+### Releases
 
 [`.github/workflows/build.yml`](./.github/workflows/build.yml) builds Release
-distributables for Windows and Linux on every push/PR to `main` (and on manual
-trigger), and uploads each as a workflow artifact
-(`neo-processing-windows`, `neo-processing-linux`).
+distributables for Windows and Linux and publishes them to a
+[GitHub Release](https://github.com/vecnode/neo-processing/releases) -
+**only when a version tag (`v*.*.*`) is pushed**, or on manual trigger. It does
+not run on ordinary pushes or PRs; day-to-day changes are branched, PR'd, and
+merged without CI. To cut a release: bump the version in `CMakeLists.txt`
+(`project(... VERSION x.y.z ...)`), tag it (`git tag vx.y.z && git push --tags`),
+and the workflow builds both platforms and attaches them to the release.
 
 ## Dependencies
 
@@ -140,7 +148,8 @@ public/             Frontend, embedded into the binary at build time
 outputs/            Saved sketches (runtime output)
 icons/              Application icons (+ app.rc, embedded as the .exe's file icon on Windows)
 assets/             README images
-.github/workflows/  CI: builds Windows + Linux distributables
+samples/            Sample files to pick via file dialogs (e.g. the "Import JS Library" test lib)
+.github/workflows/  Release build: Windows + Linux, on version tags only
 CMakeLists.txt      Build configuration
 AGENTS.md           Detailed guide for contributors and AI agents
 ```

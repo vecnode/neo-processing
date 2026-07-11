@@ -23,6 +23,12 @@ let activeLibrary = {
   isLocal: true,
 };
 
+// Source text of a user-imported .js file (see "Import JS Library"), injected
+// into the sketch iframe after p5.js and before the sketch code. Empty when
+// nothing has been imported.
+let importedLibrarySource = "";
+let importedLibraryName = "";
+
 const defaultSketch = `// Start your sketch
 function setup() {
   createCanvas(400, 400);
@@ -140,6 +146,9 @@ const fullscreenButton = document.getElementById("fullscreen-button");
 const desktopFullscreenButton = document.getElementById("desktop-fullscreen-button");
 const librarySelect = document.getElementById("library-select");
 const libraryApplyButton = document.getElementById("library-apply");
+const importLibraryButton = document.getElementById("import-library-button");
+const importLibraryInput = document.getElementById("import-library-input");
+const importLibraryHint = document.getElementById("import-library-hint");
 const sketchBgColor = document.getElementById("sketch-bg-color");
 
 // Background colour shown behind the sketch canvas (default white). Baked into
@@ -294,6 +303,35 @@ function applyLibrary() {
   if (sketchFrame) {
     runSketch();
   }
+}
+
+// Reads a locally-picked .js file and stashes its source so runSketch() injects
+// it into the sketch iframe (after p5.js, before the sketch code). Runs inside
+// the same sandboxed, opaque-origin iframe as the sketch itself, so this is no
+// broader a capability than the sketch code the user already writes there.
+function importLibraryFile() {
+  const file = importLibraryInput.files && importLibraryInput.files[0];
+  if (!file) {
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    importedLibrarySource = String(reader.result || "");
+    importedLibraryName = file.name;
+    if (importLibraryHint) {
+      importLibraryHint.textContent = `Imported: ${importedLibraryName}`;
+    }
+    appendStatus(`Imported library: ${importedLibraryName}`);
+    if (sketchFrame) {
+      runSketch();
+    }
+  };
+  reader.onerror = () => {
+    appendStatus(`Could not read ${file.name}: ${reader.error}`);
+  };
+  reader.readAsText(file);
+  importLibraryInput.value = "";
 }
 
 async function saveSketch() {
@@ -587,6 +625,7 @@ function runSketch() {
       window.parent.postMessage({ type: 'sketch-error', message: msg + ' (line ' + line + ')' }, '*');
     };
     ${captureController}
+    ${importedLibrarySource}
     ${code}
   <\/script>
 </body>
@@ -787,6 +826,11 @@ if (desktopFullscreenButton) {
 
 if (libraryApplyButton) {
   libraryApplyButton.addEventListener("click", applyLibrary);
+}
+
+if (importLibraryButton && importLibraryInput) {
+  importLibraryButton.addEventListener("click", () => importLibraryInput.click());
+  importLibraryInput.addEventListener("change", importLibraryFile);
 }
 
 // Applies the chosen sketch background: stores it (baked into the next run),
