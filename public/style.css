@@ -450,10 +450,11 @@ body {
 /* Layer 0 (see docs/proposals/layer-system.md): the panel's own background
    *is* the base layer - no code runs on it, it just stretches to fill the
    panel (including fullscreen). Layers 1..N are absolutely-positioned
-   iframes stacked on top via z-index (set inline per layer, see
-   applyLayerZIndex() in script.js), each with a transparent CSS background
-   so lower layers can show through wherever a sketch doesn't paint
-   something opaque. */
+   iframes stacked on top via z-index, sized and placed to match each
+   sketch's own createCanvas() call rather than stretched to fill the panel
+   (applyLayerZIndex()/positionLayerIframe() in script.js), each with a
+   transparent CSS background so lower layers can show through wherever a
+   sketch doesn't paint something opaque. */
 .right-panel {
   position: relative;
   overflow: hidden;
@@ -461,8 +462,8 @@ body {
   background: var(--sketch-bg, #ffffff);
 }
 
-/* Fullscreen preview: no padding - each layer iframe already fills the
-   panel exactly (position:absolute, 100%x100%, set inline). */
+/* Fullscreen preview: no padding - layer iframes are repositioned to match
+   via the ResizeObserver on .right-panel in script.js. */
 .right-panel:fullscreen {
   padding: 0;
 }
@@ -955,6 +956,13 @@ body::-webkit-scrollbar-thumb:hover {
   font-size: 0.68rem;
   color: var(--muted);
   min-width: 40px;
+}
+
+.layer-row-opacity {
+  flex: 0 0 auto;
+  width: 46px;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 .layer-row-button {

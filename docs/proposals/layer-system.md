@@ -1,12 +1,34 @@
 # Proposal: multi-layer sketches (tabs + compositing)
 
-Status: **Phases 1-2 implemented** (2026-07-11) - multi-session tabs, and
-stacked/composited layers (visibility, reorder, hidden layers actually
-pausing). Phases 3-5 (capture/record compositing rework, polish, sound
-broadcast) are still proposal-only - note Sound/Anchor broadcasts actually
-landed early, as part of Phase 2, since per-layer running state required
-touching those call sites anyway. The "Open questions" section below has
-been resolved - see "Decisions" at the end.
+Status: **Phases 1-4 implemented** (2026-07-11). The "Open questions"
+section below has been resolved - see "Decisions" at the end.
+
+Also implemented alongside Phase 2 (not originally scoped there, but became
+necessary once layers actually composited): **each layer is now sized to
+its own sketch's `createCanvas()` call** instead of being stretched to fill
+`.right-panel`. Layer iframes are absolute-positioned at their reported
+canvas size (`positionLayerIframe()`/`layerController`'s `canvas-size`
+reports), anchored per the Sketch panel's Center/Top Left setting -
+otherwise two differently-sized layers couldn't actually composite as
+distinct shapes, they'd just both stretch to the same rectangle.
+
+**Verification caveat on Phase 3:** the compositing *protocol* (request/
+response `capture-frame` messages, correct `requestId` matching, correct
+per-layer size/position math, no runtime errors) was verified end-to-end in
+the running app. The actual *pixel output* of a captured/recorded composite
+could not be verified in this session's automated browser test harness -
+`canvas.getImageData()`/`toDataURL()` consistently returned blank
+(`[0,0,0,0]`) data whenever the test tab's `document.visibilityState` was
+`"hidden"` (which it was for the whole session, including in a freshly
+opened tab with no other code involved - a plain p5 sketch in a bare
+iframe showed the same blank-readback behaviour). This reads as a
+Chromium canvas-GPU-readback-needs-compositor-focus issue specific to the
+test tooling, not the app - a real screenshot taken earlier in the same
+session *did* show the on-screen composite rendering correctly, and
+on-screen rendering and `getImageData()` readback are different code paths
+in Chromium. **Recommend a human verify Capture PNG / Record actually
+produce correct composited output in the real running app before relying on
+this.**
 
 ## Goal
 
@@ -135,25 +157,35 @@ master on/off + volume stays a single global control across all layers
    behaviour, just switchable) - proves the editor-side data model before
    touching `.right-panel`.
 2. **✅ Stacking + visibility/reorder (done).** Multiple iframes composited
-   via CSS z-index; Layers panel controls visibility/order (Up/Down buttons,
-   not drag-and-drop - see the note under Phase 4). Hidden layers pause via
-   `noLoop()`/`loop()` (verified: a self-reporting test sketch went from 15
-   frames/300ms to 0 new frames after hiding, back to 18 frames/300ms after
-   showing again). Capture/Record scoped to "active layer only", documented
-   in the Capture panel's hint text and here.
-3. **Capture/record compositing rework.** The `capture-frame` protocol above;
-   Capture PNG and Record both operate on the full composite.
-4. **Polish.** Per-layer opacity (cheap - CSS `opacity` on the iframe
-   wrapper, no canvas work needed). Real drag-and-drop reordering, if the
-   Up/Down buttons from Phase 2 turn out not to be enough - they were chosen
-   over HTML5 drag-and-drop for lower implementation risk, not because
-   drag-and-drop was ruled out.
+   via CSS z-index, each sized/positioned to its own sketch's canvas (see
+   the note above the phase list). Layers panel controls visibility/order
+   (Up/Down buttons, not drag-and-drop - see the note under Phase 4). Hidden
+   layers pause via `noLoop()`/`loop()` (verified: a self-reporting test
+   sketch went from 15 frames/300ms to 0 new frames after hiding, back to 18
+   frames/300ms after showing again).
+3. **✅ Capture/record compositing rework (done, see verification caveat
+   above).** Each layer's `captureController` now only handles
+   `capture-frame` (snapshot -> transferred `ImageBitmap`); the parent's
+   `buildCompositeCanvas()` requests one from every visible layer, draws
+   each at its on-screen position/size/opacity onto one canvas starting
+   with the layer-0 fill colour. `capturePng()` uses this directly; Record
+   now runs an entirely parent-side `MediaRecorder` fed by repeated
+   composites (`pumpCompositeRecording()`), replacing the old per-iframe
+   recorder - no more per-layer `record-start`/`record-stop` messages.
+4. **✅ Polish - per-layer opacity (done).** A 0-1 range input per layer row
+   sets `layer.iframe.style.opacity` live (visible immediately, not just in
+   captures) and is read by `buildCompositeCanvas()` via `ctx.globalAlpha`.
+   Real drag-and-drop reordering is **not** done - Up/Down buttons from
+   Phase 2 remain the reorder UI. Not ruled out, just not needed yet; revisit
+   if Up/Down turns out to be too slow for real use.
 5. **✅ Sound broadcast (done, landed early with Phase 2).** `AGENTS.md`
    updated. Security-review note: no new capability crosses the sandbox
    boundary - it's just more instances of the same `sandbox="allow-scripts"`
    iframe pattern already in the app, and the postMessage payloads
-   (`layer-set-visible`, `audio-set`, `set-anchor`) are all booleans/floats/
-   fixed strings, same shape as before.
+   (`layer-set-visible`, `audio-set`, `capture-frame`/`capture-frame-result`)
+   are all booleans/floats/fixed strings, or (for `capture-frame-result`) a
+   transferred `ImageBitmap` of the layer's own already-rendered canvas -
+   not a new capability, just how the pixels leave the sandbox.
 
 ## Decisions (resolved 2026-07-11)
 

@@ -61,26 +61,35 @@ below). The default, bundled build keeps the app fully offline.
     examples - a mismatched key silently no-ops (see `loadExample()`).
   - `#tab-strip` (above the editor) + `#layers-panel` (right half of the
     bottom row) - the layer system from `docs/proposals/layer-system.md`,
-    Phases 1-2: multi-session editing *and* stacked/composited layers. Each
-    tab is one `ace.EditSession` (own undo history/cursor/scroll) in the
-    `layers` array (`script.js`); `activateLayer()` swaps the session on the
-    single `aceEditor` instance. Each layer that's been Run gets its own
-    `sandbox="allow-scripts"` iframe, absolutely positioned and stacked in
-    `.right-panel` via inline `z-index` matching array order
-    (`applyLayerZIndex()`) - layer 0 isn't in the array at all, it's just
-    `.right-panel`'s own `background: var(--sketch-bg)`. Layer iframes have a
-    transparent CSS background so lower layers show through wherever a
-    sketch doesn't paint something opaque (the sketch's own responsibility -
-    see the proposal doc's compositing notes). Hard cap of 5 layers
-    (`MAX_LAYERS`); at least one layer must always exist (`closeLayer()`
-    refuses to close the last one). Double-click a tab label to rename.
-    Hiding a layer (`setLayerVisible()`) both removes it from the visual
-    stack and posts `layer-set-visible` to call `noLoop()`/`loop()` inside
-    it (`layerController`, injected like `captureController`), so a hidden
-    layer stops costing CPU, not just being invisible. Sound/Anchor stay
-    global broadcasts to every running layer, not per-layer (see the
-    proposal doc's "Decisions"). **Capture/Record still only capture the
-    active layer**, not the full composite - that's Phase 3, not built yet.
+    Phases 1-4: multi-session editing, stacked/composited layers, and
+    composite capture/record. Each tab is one `ace.EditSession` (own undo
+    history/cursor/scroll) in the `layers` array (`script.js`);
+    `activateLayer()` swaps the session on the single `aceEditor` instance.
+    Each layer that's been Run gets its own `sandbox="allow-scripts"`
+    iframe, positioned/sized to match its own sketch's `createCanvas()` call
+    (`positionLayerIframe()`, kept live by `layerController`'s
+    `canvas-size` reports - not stretched to fill `.right-panel`) and
+    stacked via inline `z-index` matching array order (`applyLayerZIndex()`)
+    - layer 0 isn't in the array at all, it's just `.right-panel`'s own
+    `background: var(--sketch-bg)`. Layer iframes have a transparent CSS
+    background so lower layers show through wherever a sketch doesn't paint
+    something opaque (the sketch's own responsibility - see the proposal
+    doc's compositing notes). Hard cap of 5 layers (`MAX_LAYERS`); at least
+    one layer must always exist (`closeLayer()` refuses to close the last
+    one). Double-click a tab label to rename. Hiding a layer
+    (`setLayerVisible()`) both removes it from the visual stack and posts
+    `layer-set-visible` to call `noLoop()`/`loop()` inside it
+    (`layerController`, injected like `captureController`), so a hidden
+    layer stops costing CPU, not just being invisible. Each layer row also
+    has a 0-1 opacity slider (`setLayerOpacity()`, plain CSS `opacity` on
+    the iframe - visible live, not just in captures). Sound stays a global
+    broadcast to every running layer, not per-layer (see the proposal doc's
+    "Decisions"). **Capture PNG and Record composite every visible layer**
+    (`buildCompositeCanvas()`, requesting a snapshot from each layer's
+    `captureController` via a `capture-frame`/`capture-frame-result`
+    postMessage round trip, transferring an `ImageBitmap`) - Record runs an
+    entirely parent-side `MediaRecorder` fed by repeated composites, not a
+    per-layer recorder.
   - `libraries.json` - manifest of injectable p5.js builds (`{ id, name,
     version, url, isLocal }`); see the Libraries section below.
   - `script.js` - all UI logic: editor setup, menus, file open/save, panel
@@ -143,9 +152,9 @@ else is rejected.
 
 ### The sketch runner & capture (security-sensitive)
 
-`runSketch()` in `public/script.js` injects the user's code into an `<iframe>`
-via `srcdoc` with `sandbox="allow-scripts"` (intentionally **without**
-`allow-same-origin`). This means user sketches:
+`runLayer(layer)` in `public/script.js` injects a layer's code into its own
+`<iframe>` via `srcdoc` with `sandbox="allow-scripts"` (intentionally
+**without** `allow-same-origin`). This means user sketches:
 
 - run in an **opaque origin** - they cannot read cookies/storage or call the
   local HTTP API (`/api/save-script`, etc.);
@@ -156,34 +165,45 @@ via `srcdoc` with `sandbox="allow-scripts"` (intentionally **without**
 replacement isolation strategy - it would let arbitrary user code escape the
 sandbox and reach the local server.
 
-Because the iframe is opaque-origin, **the parent cannot touch the sketch's
-canvas directly.** Recording and PNG capture therefore happen *inside* the
-iframe: a small `captureController` (also in `script.js`) is injected ahead of
-the user code and listens for `postMessage` commands from the parent.
+Because each layer's iframe is opaque-origin, **the parent cannot touch a
+sketch's canvas directly.** Each layer's `captureController` (also in
+`script.js`, one instance per layer iframe) only does one thing: on a
+`capture-frame` message, it draws its live canvas onto a logical-size
+offscreen canvas (`canvas.clientWidth/Height`, e.g. `400×400`, not the
+device-pixel-inflated backing store), turns that into an `ImageBitmap`, and
+posts it back transferred (`capture-frame-result`) - no per-frame pixel
+copying to JS beyond that one snapshot.
 
-Output media is rendered at the sketch's **logical** size (`canvas.clientWidth/
-Height`, e.g. `400×400`), not the device-pixel-inflated backing store, so files
-match the dimensions the sketch declares.
+Actual compositing happens in the **parent**, in `buildCompositeCanvas()`:
+fill with the layer-0 colour, then `Promise.all()` a `capture-frame` request
+to every currently *visible* layer, and `drawImage()` each result at that
+layer's on-screen `left`/`top`/size (see `positionLayerIframe()`) and
+`layer.opacity` (`ctx.globalAlpha`), in stacking order. `requestLayerFrame()`
+times out after 2s per layer so one unresponsive layer can't hang the whole
+capture.
 
-- **Record** (toggle button in the right side panel) → an offscreen canvas at the
-  logical size is fed each frame from the live canvas (`drawImage`), and
-  `offscreen.captureStream(fps)` + `MediaRecorder` produce a WebM blob (GPU-backed;
-  no per-frame pixel copying to JS). On stop, the bytes are transferred to the
-  parent and POSTed to `/api/save-media?ext=webm`.
-- **Capture PNG** → the live canvas is drawn once onto a logical-size offscreen
-  canvas and exported with `toBlob('image/png')`, transferred to the parent and
+- **Capture PNG** builds one composite and exports it with `toBlob('image/png')`,
   POSTed to `/api/save-media?ext=png`.
+- **Record** (toggle button in the right side panel) runs an entirely
+  parent-side `MediaRecorder` off a canvas that `pumpCompositeRecording()`
+  keeps redrawing with fresh composites in a loop (not tied to each layer's
+  own frame rate - `captureStream()` re-samples the canvas on its own
+  schedule, so a slower composite loop just means some video frames repeat
+  the previous composite, not an error). On stop, the encoded WebM is
+  POSTed to `/api/save-media?ext=webm`.
 
-Both land in `outputs/`. The controller feature-detects `captureStream` /
-`MediaRecorder` and reports a `record-error` if the webview lacks them (WebKitGTK
-support varies by version). Known limitation: capture of **WEBGL** sketches may
-be blank because p5 does not set `preserveDrawingBuffer` (this affects both the
-PNG snapshot and the per-frame `drawImage` used for recording).
+Both land in `outputs/`. Recording feature-detects `captureStream` /
+`MediaRecorder` and reports "Recording not supported by this webview" if the
+webview lacks them (WebKitGTK support varies by version). Known limitation:
+capture of **WEBGL** sketches may be blank because p5 does not set
+`preserveDrawingBuffer` (affects the per-layer snapshot regardless of which
+renderer requested it).
 
 There are two fullscreen modes, both calling `requestFullscreen()` on the preview
 pane (`.right-panel`), not the sandboxed iframe - so neither needs an iframe
-fullscreen permission. The sketch iframe's body centres its canvas on a white
-background, so the canvas shows at its exact pixel size in the middle. Esc exits.
+fullscreen permission. `.right-panel`'s `fullscreenchange` handler calls
+`repositionAllLayers()`, so each layer's canvas re-centres (or top-left-anchors)
+against the new fullscreen size, still at its own exact pixel size. Esc exits.
 
 - **Full Window** fills the WebView viewport (the app's content area). The native
   window is untouched, so it covers only the app window.
@@ -208,9 +228,9 @@ The side panel's **Libraries** section lets the user choose which p5.js build th
 sketch iframe loads. The options come from `public/libraries.json` - a manifest
 of `{ id, name, version, url, isLocal }` entries that doubles as the **allow-list**
 of injectable builds (the JS-first approach from issue #3). `script.js` tracks the
-chosen build in `activeLibrary`; `runSketch()` uses `activeLibrary.url` for the
+chosen build in `activeLibrary`; `runLayer()` uses `activeLibrary.url` for the
 iframe's p5 `<script>`, and the label under the editor reflects it. **Apply** swaps
-the active build and reloads any running sketch.
+the active build and reloads every currently-running layer (`rerunAllRunningLayers()`).
 
 The bundled build (`/libs/p5-1.11.3.min.js`, `isLocal: true`) is the default and
 keeps the app fully offline. Selecting an online build loads p5 from a CDN - this
@@ -223,7 +243,7 @@ Keep the bundled entry's `version`/`url` in sync with the actual file in
 not the `libraries.json` allow-list) and reads the chosen `.js` file's text via
 `FileReader`. The text is stashed in `importedLibrarySource` and injected into
 the sketch iframe's `srcdoc` after the capture controller and before the
-sketch code (see `runSketch()`), so it runs in the same sandboxed,
+sketch code (see `runLayer()`), so it runs in the same sandboxed,
 opaque-origin iframe as the sketch - no broader a capability than the sketch
 code the user already writes there. `samples/test-import-lib.js` is a minimal
 file for exercising the button (defines `window.neoTestLib.greet()`). This is
@@ -246,19 +266,21 @@ before `importedLibrarySource`/the sketch code) and wraps
 spliced in, and `destination` is shadowed as an *own property* on that
 instance so anything the sketch connects to `ctx.destination` lands on the
 gain node instead of real output. The parent posts `{ type: 'audio-set',
-enabled, volume }` on toggle/slider change (see `applyAudioState()`); the
-initial state is baked into the controller string per `runSketch()` call.
+enabled, volume }` to every running layer on toggle/slider change (see
+`applyAudioState()`); the initial state is baked into the controller string
+per `runLayer()` call.
 
 No new capability crosses the sandbox boundary - the message payload is just
 a boolean and a 0-1 float, and the iframe stays `sandbox="allow-scripts"`
 with no `allow-same-origin`, same as everywhere else.
 
 Known limitations (also listed in the proposal doc): browser autoplay policy
-may require a click inside the sketch before audio actually starts; the
-`captureController`'s WebM recording is still video-only (no audio track);
-and if `p5.sound` is ever bundled, verify it doesn't grab its own
-`AudioContext` reference at load time (in `<head>`) before this controller
-(in `<body>`) gets a chance to patch `window.AudioContext`.
+may require a click inside a sketch before audio actually starts; recorded
+WebM output is still video-only (no audio track - `canvas.captureStream()`,
+which the parent-side composite recorder uses, only captures pixels); and if
+`p5.sound` is ever bundled, verify it doesn't grab its own `AudioContext`
+reference at load time (in `<head>`) before this controller (in `<body>`)
+gets a chance to patch `window.AudioContext`.
 
 ## Build & run
 

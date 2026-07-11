@@ -752,6 +752,12 @@ function addLayer(code) {
     session: createLayerSession(code),
     iframe: null, // the running <iframe>, or null while stopped
     visible: true,
+    // Sized to the layer's own createCanvas() call (reported live by
+    // layerController), not stretched to fill .right-panel - defaults to
+    // 400x400 until the sketch's actual canvas size is known.
+    canvasWidth: 400,
+    canvasHeight: 400,
+    opacity: 1,
   };
   nextLayerNumber += 1;
   layers.push(layer);
@@ -780,6 +786,42 @@ function applyLayerZIndex() {
       layer.iframe.style.zIndex = String(index + 1);
     }
   });
+}
+
+// Sizes and positions one layer's iframe to match its own sketch's
+// createCanvas() call (layer.canvasWidth/Height, kept live by
+// layerController's postMessage reports - see the "canvas-size" case in the
+// message listener) rather than stretching it to fill .right-panel. This is
+// what lets layers of different sizes actually composite like stacked
+// artboards instead of all being forced to one shared size (see
+// docs/proposals/layer-system.md's "Decisions").
+function positionLayerIframe(layer) {
+  if (!layer.iframe) {
+    return;
+  }
+
+  const rightPanel = document.querySelector(".right-panel");
+  if (!rightPanel) {
+    return;
+  }
+
+  const w = layer.canvasWidth || 400;
+  const h = layer.canvasHeight || 400;
+  layer.iframe.style.width = `${w}px`;
+  layer.iframe.style.height = `${h}px`;
+
+  if (sketchAnchor === "center") {
+    const rect = rightPanel.getBoundingClientRect();
+    layer.iframe.style.left = `${Math.max(0, (rect.width - w) / 2)}px`;
+    layer.iframe.style.top = `${Math.max(0, (rect.height - h) / 2)}px`;
+  } else {
+    layer.iframe.style.left = "0px";
+    layer.iframe.style.top = "0px";
+  }
+}
+
+function repositionAllLayers() {
+  layers.forEach(positionLayerIframe);
 }
 
 // Closes a layer's tab: stops its iframe (if running) and drops its Ace
@@ -848,6 +890,17 @@ function setLayerVisible(layer, visible) {
     }
   }
   renderLayerUI();
+}
+
+// Per-layer opacity (0-1): a plain CSS opacity on the iframe wrapper, so it
+// costs nothing extra to render and shows live in the editor, not just in
+// captured/recorded composites (buildCompositeCanvas() reads the same
+// layer.opacity value when compositing).
+function setLayerOpacity(layer, opacity) {
+  layer.opacity = opacity;
+  if (layer.iframe) {
+    layer.iframe.style.opacity = String(opacity);
+  }
 }
 
 function renderTabStrip() {
@@ -955,6 +1008,18 @@ function renderLayersPanel() {
     status.className = "layer-row-status";
     status.textContent = !layer.iframe ? "Stopped" : layer.visible ? "Running" : "Hidden";
 
+    const opacitySlider = document.createElement("input");
+    opacitySlider.type = "range";
+    opacitySlider.className = "layer-row-opacity";
+    opacitySlider.min = "0";
+    opacitySlider.max = "1";
+    opacitySlider.step = "0.05";
+    opacitySlider.value = String(typeof layer.opacity === "number" ? layer.opacity : 1);
+    opacitySlider.setAttribute("aria-label", `${layer.name} opacity`);
+    opacitySlider.addEventListener("input", (event) => {
+      setLayerOpacity(layer, parseFloat(event.target.value));
+    });
+
     const upButton = document.createElement("button");
     upButton.type = "button";
     upButton.className = "layer-row-button";
@@ -987,6 +1052,7 @@ function renderLayersPanel() {
 
     row.appendChild(name);
     row.appendChild(status);
+    row.appendChild(opacitySlider);
     row.appendChild(upButton);
     row.appendChild(downButton);
     row.appendChild(visibilityButton);
@@ -1237,6 +1303,11 @@ function toggleSidebar() {
   hamburgerButton.setAttribute("aria-expanded", String(isOpen));
   sidePanel.setAttribute("aria-hidden", String(!isOpen));
   appendStatus(isOpen ? "Sidebar opened" : "Sidebar closed");
+  // .right-panel's width changes via the 0.2s CSS width transition on
+  // .main-layout/.side-panel - reposition once it's settled. (Also covered
+  // by the ResizeObserver below, but that may not fire in every webview;
+  // this is the reliable belt-and-suspenders path.)
+  window.setTimeout(repositionAllLayers, 220);
 }
 
 function updateSplitFromPointer(clientX) {
@@ -1251,6 +1322,7 @@ function updateSplitFromPointer(clientX) {
 
   const percent = ((clientX - rect.left) / rect.width) * 100;
   setLeftPanelSize(percent);
+  repositionAllLayers();
 }
 
 
@@ -1309,7 +1381,17 @@ window.addEventListener("resize", () => {
   if (aceEditor) {
     aceEditor.resize();
   }
+  repositionAllLayers();
 });
+
+// Belt-and-suspenders: also reposition on any .right-panel size change via
+// ResizeObserver, in case some resize path isn't covered by the explicit
+// calls above - cheap either way, since positionLayerIframe() just reads
+// the panel's current getBoundingClientRect() each time.
+const rightPanelForResize = document.querySelector(".right-panel");
+if (rightPanelForResize && typeof ResizeObserver !== "undefined") {
+  new ResizeObserver(() => repositionAllLayers()).observe(rightPanelForResize);
+}
 
 
 
@@ -1318,94 +1400,48 @@ window.addEventListener("resize", () => {
 // iframe is sandboxed to an opaque origin, the parent cannot touch its canvas
 // directly — instead we record/snapshot here (using the GPU-backed
 // MediaRecorder / toBlob APIs) and ship the resulting bytes out via postMessage.
+// Capture/record controller injected into every layer's iframe. Because
+// each iframe is sandboxed to an opaque origin, the parent cannot touch its
+// canvas directly - instead each layer snapshots itself on request and
+// ships an ImageBitmap out (transferred, no copy). The parent composites
+// every visible layer's bitmap into one canvas (see buildCompositeCanvas())
+// for both Capture PNG and Record - see docs/proposals/layer-system.md
+// Phase 3. Recording itself (MediaRecorder, encoding) now happens entirely
+// in the parent, driven by repeated composites - no per-iframe recorder.
 const captureController = `
 (function () {
-  var recorder = null;
-  var chunks = [];
-  var recording = false;
-  var rafId = 0;
   function canvas() { return document.querySelector('canvas'); }
-  function send(type, extra, transfer) {
-    var msg = Object.assign({ type: type }, extra || {});
-    parent.postMessage(msg, '*', transfer || []);
-  }
   // Logical sketch size (e.g. createCanvas(400, 400)), independent of the
-  // device pixel ratio that inflates the canvas backing store. Output media is
-  // rendered at this size so files match the dimensions the sketch declares.
+  // device pixel ratio that inflates the canvas backing store. Output media
+  // is rendered at this size so files match the dimensions the sketch
+  // declares.
   function logicalSize(el) {
     return {
       w: Math.max(1, Math.round(el.clientWidth || el.width)),
       h: Math.max(1, Math.round(el.clientHeight || el.height))
     };
   }
-  function pickMime() {
-    var c = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
-    for (var i = 0; i < c.length; i++) {
-      if (window.MediaRecorder && MediaRecorder.isTypeSupported(c[i])) return c[i];
-    }
-    return '';
-  }
   window.addEventListener('message', function (event) {
     var data = event.data || {};
-    if (data.type === 'capture-png') {
+    if (data.type === 'capture-frame') {
       var el = canvas();
-      if (!el) { send('capture-error', { message: 'No canvas in sketch' }); return; }
+      if (!el) {
+        parent.postMessage({ type: 'capture-frame-result', requestId: data.requestId, ok: false }, '*');
+        return;
+      }
       var s = logicalSize(el);
       var off = document.createElement('canvas');
       off.width = s.w; off.height = s.h;
       off.getContext('2d').drawImage(el, 0, 0, s.w, s.h);
-      off.toBlob(function (blob) {
-        if (!blob) { send('capture-error', { message: 'Snapshot failed' }); return; }
-        blob.arrayBuffer().then(function (buf) {
-          send('capture-complete', { buffer: buf, ext: 'png' }, [buf]);
-        });
-      }, 'image/png');
-    } else if (data.type === 'record-start') {
-      var el2 = canvas();
-      if (!el2) { send('record-error', { message: 'No canvas in sketch' }); return; }
-      if (recorder && recorder.state !== 'inactive') return;
-      // Record from an offscreen canvas sized to the logical sketch, fed each
-      // frame from the live canvas — the WebM matches the declared dimensions.
-      var s2 = logicalSize(el2);
-      var rec = document.createElement('canvas');
-      rec.width = s2.w; rec.height = s2.h;
-      var ctx = rec.getContext('2d');
-      if (!rec.captureStream || !window.MediaRecorder) {
-        send('record-error', { message: 'Recording not supported by this webview' });
-        return;
-      }
-      var mime = pickMime();
-      try {
-        var stream = rec.captureStream(data.fps || 60);
-        recorder = mime ? new MediaRecorder(stream, { mimeType: mime })
-                        : new MediaRecorder(stream);
-      } catch (err) { send('record-error', { message: String(err) }); return; }
-      chunks = [];
-      recording = true;
-      (function pump() {
-        if (!recording) return;
-        var src = canvas();
-        if (src) ctx.drawImage(src, 0, 0, rec.width, rec.height);
-        rafId = requestAnimationFrame(pump);
-      })();
-      recorder.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
-      recorder.onstop = function () {
-        recording = false;
-        if (rafId) cancelAnimationFrame(rafId);
-        var blob = new Blob(chunks, { type: (recorder && recorder.mimeType) || 'video/webm' });
-        blob.arrayBuffer().then(function (buf) {
-          send('recording-complete', { buffer: buf, ext: 'webm' }, [buf]);
-        });
-      };
-      recorder.start();
-      send('record-started', {});
-    } else if (data.type === 'record-stop') {
-      recording = false;
-      if (recorder && recorder.state !== 'inactive') recorder.stop();
-    } else if (data.type === 'set-anchor') {
-      var a = data.anchor === 'center' ? 'center' : 'flex-start';
-      document.body.style.alignItems = a;
-      document.body.style.justifyContent = a;
+      createImageBitmap(off).then(function (bitmap) {
+        parent.postMessage(
+          { type: 'capture-frame-result', requestId: data.requestId, ok: true, w: s.w, h: s.h, bitmap: bitmap },
+          '*',
+          [bitmap]
+        );
+      }).catch(function (err) {
+        parent.postMessage({ type: 'capture-frame-result', requestId: data.requestId, ok: false, error: String(err) }, '*');
+      });
     }
   });
 })();
@@ -1455,11 +1491,29 @@ function buildAudioController(initialEnabled, initialVolume) {
 `;
 }
 
-// Lets the parent pause/resume a layer's draw loop (see setLayerVisible()) -
-// hiding a layer both removes it from the visual stack and stops it costing
-// CPU, rather than just being invisible while still rendering every frame.
+// Two jobs for the parent, per layer: (1) pause/resume the draw loop when
+// hidden (see setLayerVisible()) - hiding both removes a layer from the
+// visual stack and stops it costing CPU; (2) report the sketch's actual
+// canvas size (from createCanvas()) so the parent can size/position this
+// layer's iframe to match instead of stretching it to fill .right-panel -
+// that's what lets differently-sized layers actually composite like
+// stacked artboards (see docs/proposals/layer-system.md's "Decisions").
+// Polls rather than using a MutationObserver/ResizeObserver on the canvas:
+// simpler, and cheap enough at a 4x/second cadence.
 const layerController = `
 (function () {
+  var lastW = 0, lastH = 0;
+  function reportCanvasSize() {
+    var el = document.querySelector('canvas');
+    if (!el) return;
+    var w = Math.max(1, Math.round(el.clientWidth || el.width));
+    var h = Math.max(1, Math.round(el.clientHeight || el.height));
+    if (w !== lastW || h !== lastH) {
+      lastW = w; lastH = h;
+      parent.postMessage({ type: 'canvas-size', width: w, height: h }, '*');
+    }
+  }
+  setInterval(reportCanvasSize, 250);
   window.addEventListener('message', function (event) {
     var data = event.data || {};
     if (data.type === 'layer-set-visible') {
@@ -1495,9 +1549,16 @@ function runLayer(layer) {
     layer.iframe = null;
   }
 
+  // Reset to the default size for this run - a fresh sketch may declare a
+  // completely different createCanvas() size than whatever was there
+  // before; layerController's live reports correct this shortly after.
+  layer.canvasWidth = 400;
+  layer.canvasHeight = 400;
+
   const code = layer.session.getValue();
   const iframe = document.createElement("iframe");
-  iframe.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;border:none;background:transparent;";
+  iframe.style.cssText = "position:absolute;border:none;background:transparent;";
+  iframe.style.opacity = String(typeof layer.opacity === "number" ? layer.opacity : 1);
   // Run user sketches in an opaque origin: scripts are permitted, but the
   // sketch cannot reach the parent document, cookies, storage, or the local
   // HTTP API. (allow-same-origin is deliberately omitted.)
@@ -1508,14 +1569,16 @@ function runLayer(layer) {
 <head>
   <meta charset="UTF-8">
   <style>
+    /* The iframe is sized to match the sketch's own createCanvas() call
+       (see positionLayerIframe() in the parent) and positionLayerIframe()
+       is what actually applies the Sketch panel's anchor setting - by
+       placing this canvas-sized iframe within .right-panel. No centring
+       needed in here; the canvas already fills the iframe exactly. */
     html, body { height: 100%; }
     body {
       margin: 0;
       overflow: hidden;
       background: transparent;
-      display: flex;
-      align-items: ${sketchAnchor === "center" ? "center" : "flex-start"};
-      justify-content: ${sketchAnchor === "center" ? "center" : "flex-start"};
     }
   </style>
   <script src="${activeLibrary.url}"><\/script>
@@ -1539,6 +1602,7 @@ function runLayer(layer) {
   rightPanel.appendChild(iframe);
   layer.iframe = iframe;
   applyLayerZIndex();
+  positionLayerIframe(layer);
   renderLayerUI();
 }
 
@@ -1623,35 +1687,190 @@ function resetRecordingState() {
   setRecordingUI(false);
 }
 
-// Capture/Record target the active layer only - compositing the full
-// stack for capture/recording is a later phase (see
-// docs/proposals/layer-system.md).
-function postToSketch(message) {
-  const layer = activeLayer();
-  if (!layer || !layer.iframe || !layer.iframe.contentWindow) {
-    appendStatus("Run a sketch first");
-    return false;
-  }
+// Asks one layer's captureController for a snapshot of its current canvas,
+// returned as a transferred ImageBitmap. Resolves null on timeout/error/no
+// canvas so a single unresponsive layer can't hang the whole composite.
+function requestLayerFrame(layer) {
+  return new Promise((resolve) => {
+    if (!layer.iframe || !layer.iframe.contentWindow) {
+      resolve(null);
+      return;
+    }
 
-  layer.iframe.contentWindow.postMessage(message, "*");
-  return true;
+    const requestId = `${layer.id}-${Date.now()}-${Math.random()}`;
+    const timeoutId = window.setTimeout(() => {
+      window.removeEventListener("message", handleResult);
+      resolve(null);
+    }, 2000);
+
+    function handleResult(event) {
+      const data = event.data;
+      if (!data || data.type !== "capture-frame-result" || data.requestId !== requestId) {
+        return;
+      }
+      window.clearTimeout(timeoutId);
+      window.removeEventListener("message", handleResult);
+      resolve(data.ok ? { bitmap: data.bitmap, w: data.w, h: data.h } : null);
+    }
+
+    window.addEventListener("message", handleResult);
+    layer.iframe.contentWindow.postMessage({ type: "capture-frame", requestId }, "*");
+  });
 }
 
-function capturePng() {
-  if (postToSketch({ type: "capture-png" })) {
-    appendStatus("Capturing frame...");
+// Builds one canvas compositing every currently visible, running layer -
+// layer 0's fill colour first, then each layer's snapshot drawn at its own
+// on-screen position/size (see positionLayerIframe()) and opacity, in
+// stacking order. Used by both Capture PNG and Record (see
+// docs/proposals/layer-system.md Phase 3).
+async function buildCompositeCanvas() {
+  const rightPanel = document.querySelector(".right-panel");
+  const rect = rightPanel.getBoundingClientRect();
+  const composite = document.createElement("canvas");
+  composite.width = Math.max(1, Math.round(rect.width));
+  composite.height = Math.max(1, Math.round(rect.height));
+  const ctx = composite.getContext("2d");
+  ctx.fillStyle = sketchBg;
+  ctx.fillRect(0, 0, composite.width, composite.height);
+
+  const visibleLayers = layers.filter((l) => l.iframe && l.visible);
+  const frames = await Promise.all(visibleLayers.map(requestLayerFrame));
+
+  frames.forEach((frame, index) => {
+    if (!frame) {
+      return;
+    }
+    const layer = visibleLayers[index];
+    const left = parseFloat(layer.iframe.style.left) || 0;
+    const top = parseFloat(layer.iframe.style.top) || 0;
+    ctx.save();
+    ctx.globalAlpha = typeof layer.opacity === "number" ? layer.opacity : 1;
+    ctx.drawImage(frame.bitmap, left, top, frame.w, frame.h);
+    ctx.restore();
+    frame.bitmap.close();
+  });
+
+  return composite;
+}
+
+async function capturePng() {
+  if (!layers.some((l) => l.iframe)) {
+    appendStatus("Run a sketch first");
+    return;
   }
+
+  appendStatus("Capturing frame...");
+  try {
+    const composite = await buildCompositeCanvas();
+    const blob = await new Promise((resolve) => composite.toBlob(resolve, "image/png"));
+    if (!blob) {
+      throw new Error("Snapshot failed");
+    }
+    const buffer = await blob.arrayBuffer();
+    const name = await saveMedia(buffer, "png");
+    appendStatus(`Saved frame to outputs/${name}`);
+  } catch (error) {
+    appendStatus(`Capture error: ${error.message}`);
+  }
+}
+
+// Composite recording: repeatedly rebuilds the full composite (see
+// buildCompositeCanvas()) and draws it onto a canvas whose MediaRecorder
+// stream is what actually gets encoded - so the recording matches whatever
+// Capture PNG would produce at any given moment, not just one layer.
+let compositeRecorder = null;
+let compositeRecordingChunks = [];
+let compositeRecordingActive = false;
+
+function pickRecordingMimeType() {
+  const candidates = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"];
+  for (const candidate of candidates) {
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(candidate)) {
+      return candidate;
+    }
+  }
+  return "";
+}
+
+async function pumpCompositeRecording(ctx, canvas) {
+  while (compositeRecordingActive) {
+    const frame = await buildCompositeCanvas();
+    if (!compositeRecordingActive) {
+      break;
+    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(frame, 0, 0);
+    // Brief yield between composites so this loop doesn't peg the CPU -
+    // captureStream() re-samples the canvas's current pixels on its own
+    // schedule, so composites don't need to land on every video frame.
+    await new Promise((resolve) => window.setTimeout(resolve, 16));
+  }
+}
+
+function startCompositeRecording() {
+  if (!layers.some((l) => l.iframe)) {
+    appendStatus("Run a sketch first");
+    return;
+  }
+
+  const rightPanel = document.querySelector(".right-panel");
+  const rect = rightPanel.getBoundingClientRect();
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(rect.width));
+  canvas.height = Math.max(1, Math.round(rect.height));
+  const ctx = canvas.getContext("2d");
+
+  if (!canvas.captureStream || !window.MediaRecorder) {
+    appendStatus("Recording not supported by this webview");
+    return;
+  }
+
+  const stream = canvas.captureStream(60);
+  const mimeType = pickRecordingMimeType();
+  try {
+    compositeRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+  } catch (error) {
+    appendStatus(`Recording error: ${error.message}`);
+    return;
+  }
+
+  compositeRecordingChunks = [];
+  compositeRecorder.ondataavailable = (event) => {
+    if (event.data && event.data.size) {
+      compositeRecordingChunks.push(event.data);
+    }
+  };
+  compositeRecorder.onstop = () => {
+    const blob = new Blob(compositeRecordingChunks, { type: (compositeRecorder && compositeRecorder.mimeType) || "video/webm" });
+    blob.arrayBuffer().then((buffer) => {
+      saveMedia(buffer, "webm")
+        .then((name) => appendStatus(`Saved recording to outputs/${name}`))
+        .catch((error) => appendStatus(`Save failed: ${error.message}`));
+    });
+  };
+
+  compositeRecordingActive = true;
+  setRecordingUI(true);
+  appendStatus("Recording composite...");
+  compositeRecorder.start();
+  pumpCompositeRecording(ctx, canvas);
+}
+
+function stopCompositeRecording() {
+  compositeRecordingActive = false;
+  if (compositeRecorder && compositeRecorder.state !== "inactive") {
+    compositeRecorder.stop();
+  }
+  setRecordingUI(false);
 }
 
 function toggleRecording() {
   if (isRecording) {
-    postToSketch({ type: "record-stop" });
+    stopCompositeRecording();
     return;
   }
 
-  if (postToSketch({ type: "record-start", fps: 60 })) {
-    appendStatus("Starting recording...");
-  }
+  startCompositeRecording();
 }
 
 // "Full Window": fill the WebView viewport (the app's content area) with the
@@ -1727,6 +1946,7 @@ document.addEventListener("fullscreenchange", () => {
       window.neoSetDesktopFullscreen(false);
     }
   }
+  repositionAllLayers();
 });
 
 window.addEventListener("message", (event) => {
@@ -1739,28 +1959,17 @@ window.addEventListener("message", (event) => {
     case "sketch-error":
       appendStatus(`Sketch error: ${data.message}`);
       break;
-    case "record-started":
-      setRecordingUI(true);
-      appendStatus("Recording...");
+    case "canvas-size": {
+      // Identify which layer sent this by matching event.source (its
+      // iframe's contentWindow) - multiple layers share this one listener.
+      const layer = layers.find((l) => l.iframe && l.iframe.contentWindow === event.source);
+      if (layer && (layer.canvasWidth !== data.width || layer.canvasHeight !== data.height)) {
+        layer.canvasWidth = data.width;
+        layer.canvasHeight = data.height;
+        positionLayerIframe(layer);
+      }
       break;
-    case "record-error":
-      setRecordingUI(false);
-      appendStatus(`Recording error: ${data.message}`);
-      break;
-    case "capture-error":
-      appendStatus(`Capture error: ${data.message}`);
-      break;
-    case "recording-complete":
-      setRecordingUI(false);
-      saveMedia(data.buffer, data.ext || "webm")
-        .then((name) => appendStatus(`Saved recording to outputs/${name}`))
-        .catch((error) => appendStatus(`Save failed: ${error.message}`));
-      break;
-    case "capture-complete":
-      saveMedia(data.buffer, data.ext || "png")
-        .then((name) => appendStatus(`Saved frame to outputs/${name}`))
-        .catch((error) => appendStatus(`Save failed: ${error.message}`));
-      break;
+    }
     default:
       break;
   }
@@ -1807,17 +2016,15 @@ if (sketchBgColor) {
   });
 }
 
-// Anchor switch: stores the choice (baked into the next run) and pushes it
-// live to every running layer so canvases reposition immediately. Global
-// across all layers, same as Sound and Libraries (see
-// docs/proposals/layer-system.md's "Decisions").
+// Anchor switch: stores the choice and repositions every running layer's
+// iframe within .right-panel immediately (each iframe is sized to its own
+// canvas - see positionLayerIframe() - so "anchor" now means where that
+// canvas-sized iframe sits in the panel, not where the canvas sits within
+// an oversized iframe). Global across all layers, same as Sound and
+// Libraries (see docs/proposals/layer-system.md's "Decisions").
 function applySketchAnchor(anchor) {
   sketchAnchor = anchor;
-  layers.forEach((layer) => {
-    if (layer.iframe && layer.iframe.contentWindow) {
-      layer.iframe.contentWindow.postMessage({ type: "set-anchor", anchor }, "*");
-    }
-  });
+  repositionAllLayers();
 }
 
 anchorButtons.forEach((button) => {
@@ -1943,6 +2150,7 @@ function setBottomPanelSize(px) {
   if (aceEditor) {
     aceEditor.resize();
   }
+  repositionAllLayers();
 }
 
 function updateBottomFromPointer(clientY) {
