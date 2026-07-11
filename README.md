@@ -23,8 +23,15 @@ sketch with the goal of real-world, full-screen deployment.
   with a resizable split between source and preview.
 - **Live sketch preview** - run your sketch instantly in an isolated, sandboxed
   preview pane.
-- **Record & capture** - record the running canvas to WebM video or capture a
-  PNG frame, both rendered at the sketch's declared size and saved to `outputs/`.
+- **Record & capture** - record the composite of every visible layer to WebM
+  video or capture it as a PNG frame, saved to `outputs/`.
+- **Layers** - a tab strip above the editor, one independent, simultaneously-
+  running sketch per tab (up to 5), each sized to its own `createCanvas()` and
+  composited together in the preview pane. A Layers panel controls per-layer
+  visibility (hidden layers actually stop running, not just hide), stacking
+  order, opacity, and stop. See
+  [docs/proposals/layer-system.md](./docs/proposals/layer-system.md) for the
+  design.
 - **Fullscreen preview** - present the sketch centred at its exact size on a
   white backdrop; press Esc to exit.
 - **Local-first & offline** - the frontend and the bundled p5.js build are
@@ -46,9 +53,6 @@ sketch with the goal of real-world, full-screen deployment.
 
 - Full-screen rendering for deployed installations.
 - Exporting standalone, editor-free applications per sketch.
-- Multi-layer sketches (tabs + a compositing stack) - see
-  [docs/proposals/layer-system.md](./docs/proposals/layer-system.md) for the
-  design proposal (not yet implemented).
 
 ## Architecture
 
