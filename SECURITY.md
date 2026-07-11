@@ -57,7 +57,7 @@ It does **not** cover:
 - User-authored sketches/scripts and any content they load.
 - Forks or downstream redistributions of this project.
 - Vulnerabilities solely within the OS-provided WebView runtime
-  (WebView2 / WebKitGTK) — please report those to the respective vendor — though
+  (WebView2 / WebKitGTK) - please report those to the respective vendor - though
   we will adjust our integration when it can mitigate an issue.
 
 ## Security model
@@ -76,7 +76,7 @@ that weaken them should be treated as security-relevant:
 - **Origin-checked write endpoints.** The write APIs (`/api/save-script`,
   `/api/save-media`) reject requests whose `Origin` is not the app's own page
   origin. The editor UI's POSTs carry that origin; a sketch's opaque-origin
-  requests carry `Origin: null` and are denied — so sketch code cannot drive the
+  requests carry `Origin: null` and are denied - so sketch code cannot drive the
   server even via a fire-and-forget request whose response it can't read.
 - **Constrained server endpoints.** Request bodies are size-capped and requests
   are time-bounded. Saved files use server-generated names; the only
@@ -93,7 +93,7 @@ See [AGENTS.md](./AGENTS.md) for the detailed architecture and HTTP contract.
 Because neo-processing executes user-provided JavaScript inside a WebView:
 
 - Only open sketches and projects from sources you trust.
-- Treat a sketch like any other program — review code before running it,
+- Treat a sketch like any other program - review code before running it,
   especially anything that loads third-party libraries.
 - Be cautious if you enable future options that fetch libraries over the network.
 
@@ -110,7 +110,7 @@ Because neo-processing executes user-provided JavaScript inside a WebView:
   data without an independent authorization check.
 - Preserve the sandbox (`allow-scripts` only), the loopback bind address, and the
   `Origin` check on the write endpoints.
-- Keep dependencies — including the WebView runtime and fetched libraries —
+- Keep dependencies - including the WebView runtime and fetched libraries -
   reasonably current.
 
 ## Handling and disclosure

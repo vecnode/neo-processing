@@ -47,6 +47,11 @@
             <button id="library-apply" class="panel-button" type="button">Apply</button>
           </div>
           <p class="panel-hint">Choose a p5.js build to load into your sketches. Online builds require a connection.</p>
+          <div class="panel-controls">
+            <button id="import-library-button" class="panel-button" type="button">Import JS Library</button>
+            <input type="file" id="import-library-input" accept=".js,text/javascript" hidden>
+          </div>
+          <p class="panel-hint" id="import-library-hint">Load a local .js file into the sketch iframe alongside p5.js.</p>
         </section>
       </div>
     </aside>

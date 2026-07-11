@@ -14,12 +14,12 @@ The whole product is a single C++ executable that:
 
 1. Starts a local HTTP server bound to `127.0.0.1` on an OS-assigned port.
 2. Serves a small web frontend (Ace editor + p5.js runner) that is **embedded
-   into the binary** at build time — `public/` is not read from disk at runtime.
+   into the binary** at build time - `public/` is not read from disk at runtime.
 3. Opens a native [webview](https://github.com/webview/webview) window pointed at
    that local server (WebView2 on Windows, WebKitGTK on Linux).
 
 There is no separate backend process and no external network dependency at
-runtime — the only optional exception is choosing an online p5.js build from
+runtime - the only optional exception is choosing an online p5.js build from
 the Libraries panel, which loads that build from a CDN (see "Libraries"
 below). The default, bundled build keeps the app fully offline.
 
@@ -41,58 +41,59 @@ below). The default, bundled build keeps the app fully offline.
 └─────────────────────────────────────────────┘
 ```
 
-- **`src/main.cpp`** — the entire C++ application. Entry point, HTTP routes,
+- **`src/main.cpp`** - the entire C++ application. Entry point, HTTP routes,
   window creation, per-OS icon handling, and graceful shutdown.
-- **`public/`** — the frontend, embedded into the binary via `cpp-embedlib`:
-  - `index.html` — layout: menu bar (Run, Stop, File, Examples), Ace editor + p5
+- **`public/`** - the frontend, embedded into the binary via `cpp-embedlib`:
+  - `index.html` - layout: menu bar (Run, Stop, File, Examples), Ace editor + p5
     version label (left), sketch preview (right), a draggable horizontal splitter,
     a resizable status/terminal row (bottom), and a collapsible side panel with a
     Capture section (Record / Capture PNG / Full Window / Fullscreen), a Sketch
-    section (canvas anchor toggle — Center/Top Left — and a background-colour
+    section (canvas anchor toggle - Center/Top Left - and a background-colour
     picker for the area behind the canvas), and a Libraries section (p5.js build
     picker). Stop tears down the sketch iframe; the
     `.splitter` resizes the editor/preview split and `.h-splitter` the terminal
     height (both drive CSS custom properties on the grid).
-  - `libraries.json` — manifest of injectable p5.js builds (`{ id, name,
+  - `libraries.json` - manifest of injectable p5.js builds (`{ id, name,
     version, url, isLocal }`); see the Libraries section below.
-  - `script.js` — all UI logic: editor setup, menus, file open/save, panel
+  - `script.js` - all UI logic: editor setup, menus, file open/save, panel
     splitter, the sketch runner, and the capture/fullscreen controls.
-  - `style.css` — styling. The `html` element is set to `zoom: 0.8` so the app
+  - `style.css` - styling. The `html` element is set to `zoom: 0.8` so the app
     starts at 80% of its natural size (more editor/preview space in the same
     window); this scales fonts, paddings, and controls together instead of
     tuning each dimension by hand.
-  - `libs/` — vendored third-party JS (Ace editor, p5.js). These are committed.
+  - `libs/` - vendored third-party JS (Ace editor, p5.js). These are committed.
     The bundled p5 version is declared once as `P5_VERSION` in `script.js`, which
     drives both the version label and the `<script>` URL the sketch iframe loads;
     keep it in sync with the `public/libs/p5-<version>.min.js` filename.
-- **`outputs/`** — where saved sketches are written at runtime
+- **`outputs/`** - where saved sketches are written at runtime
   (`POST /api/save-script`). Treated as scratch output; safe to clear.
-- **`icons/`** — `.ico` files copied next to the executable on Windows and loaded
+- **`icons/`** - `.ico` files copied next to the executable on Windows and loaded
   at runtime for the window/taskbar icon (`app_icon.ico` large, `app_icon_small.ico`
   small/title-bar). `icons/app.rc` is a Win32 resource script that embeds
   `app_icon.ico` into the `.exe` itself at build time (Windows only), so
-  Explorer/Alt+Tab show it as the file's own icon — separate from, and in
+  Explorer/Alt+Tab show it as the file's own icon - separate from, and in
   addition to, the runtime `LoadImageW`/`WM_SETICON` calls in `main.cpp` that
   set the *window* icon from the same files.
-- **`assets/`** — screenshots for the README only.
-- **`.github/workflows/build.yml`** — CI: builds Release distributables for
-  Windows and Linux on push/PR to `main`, uploaded as workflow artifacts.
+- **`assets/`** - screenshots for the README only.
+- **`.github/workflows/build.yml`** - builds Release distributables for Windows
+  and Linux and publishes a GitHub Release, but only on a pushed version tag
+  (`v*.*.*`) or manual trigger - not on every push/PR.
 
 ### Request/response contract
 
 | Route                  | Method | Body            | Success            | Errors |
 |------------------------|--------|-----------------|--------------------|--------|
-| `/health`              | GET    | —               | `200` `ok`         | —      |
+| `/health`              | GET    | -               | `200` `ok`         | -      |
 | `/api/save-script`     | POST   | sketch as text  | `200` `<filename>` | `403` bad origin, `400` empty, `413` too large, `500` write failure |
 | `/api/save-media?ext=` | POST   | binary (PNG/WebM) | `200` `<filename>` | `403` bad origin, `400` bad/empty ext or body, `413` too large, `500` write failure |
-| everything else        | GET    | —               | embedded static asset | `404` |
+| everything else        | GET    | -               | embedded static asset | `404` |
 
 Both write endpoints reject requests whose `Origin` header isn't the app's own
 page origin (`http://127.0.0.1:<port>`). The editor UI's POSTs carry that origin;
 a sketch's opaque-origin iframe sends `Origin: null` and is denied, so sketch
 code cannot reach these endpoints even via a fire-and-forget request.
 
-Saved files are named server-side from the clock — scripts as
+Saved files are named server-side from the clock - scripts as
 `YYYY-MM-DD-HH-MM-SS_p5.js`, media as `YYYY-MM-DD-HH-MM-SS-mmm_<capture|recording>.<ext>`.
 The client never supplies a path, so there is no path-traversal surface. For
 `/api/save-media` the `ext` query param is sanitised to lower-case alphanumerics
@@ -105,13 +106,13 @@ else is rejected.
 via `srcdoc` with `sandbox="allow-scripts"` (intentionally **without**
 `allow-same-origin`). This means user sketches:
 
-- run in an **opaque origin** — they cannot read cookies/storage or call the
+- run in an **opaque origin** - they cannot read cookies/storage or call the
   local HTTP API (`/api/save-script`, etc.);
 - can still load `/libs/p5-1.11.3.min.js` as a subresource and report errors to
   the parent via `postMessage`.
 
 **Do not add `allow-same-origin` back** unless you have a deliberate reason and a
-replacement isolation strategy — it would let arbitrary user code escape the
+replacement isolation strategy - it would let arbitrary user code escape the
 sandbox and reach the local server.
 
 Because the iframe is opaque-origin, **the parent cannot touch the sketch's
@@ -139,14 +140,14 @@ be blank because p5 does not set `preserveDrawingBuffer` (this affects both the
 PNG snapshot and the per-frame `drawImage` used for recording).
 
 There are two fullscreen modes, both calling `requestFullscreen()` on the preview
-pane (`.right-panel`), not the sandboxed iframe — so neither needs an iframe
+pane (`.right-panel`), not the sandboxed iframe - so neither needs an iframe
 fullscreen permission. The sketch iframe's body centres its canvas on a white
 background, so the canvas shows at its exact pixel size in the middle. Esc exits.
 
 - **Full Window** fills the WebView viewport (the app's content area). The native
   window is untouched, so it covers only the app window.
 - **Fullscreen** does the same *and* drives the native OS window into borderless
-  full-screen via `window.neoSetDesktopFullscreen(bool)` — a function bound in
+  full-screen via `window.neoSetDesktopFullscreen(bool)` - a function bound in
   C++ (`main.cpp`) that strips the window frame and stretches it over the monitor
   (Win32) or calls `gtk_window_fullscreen` (Linux), so the sketch covers the
   whole desktop. On exit, the `fullscreenchange` handler restores the native
@@ -155,7 +156,7 @@ background, so the canvas shows at its exact pixel size in the middle. Esc exits
 ### Libraries (p5.js build selection)
 
 The side panel's **Libraries** section lets the user choose which p5.js build the
-sketch iframe loads. The options come from `public/libraries.json` — a manifest
+sketch iframe loads. The options come from `public/libraries.json` - a manifest
 of `{ id, name, version, url, isLocal }` entries that doubles as the **allow-list**
 of injectable builds (the JS-first approach from issue #3). `script.js` tracks the
 chosen build in `activeLibrary`; `runSketch()` uses `activeLibrary.url` for the
@@ -163,11 +164,23 @@ iframe's p5 `<script>`, and the label under the editor reflects it. **Apply** sw
 the active build and reloads any running sketch.
 
 The bundled build (`/libs/p5-1.11.3.min.js`, `isLocal: true`) is the default and
-keeps the app fully offline. Selecting an online build loads p5 from a CDN — this
+keeps the app fully offline. Selecting an online build loads p5 from a CDN - this
 trades offline-first for version flexibility and is loaded inside the same
 sandboxed, opaque-origin iframe (so it cannot reach the parent or the local API).
 Keep the bundled entry's `version`/`url` in sync with the actual file in
 `public/libs/` and with `P5_VERSION` in `script.js`.
+
+**Import JS Library** (below Apply) opens a native file picker (`input[type=file]`,
+not the `libraries.json` allow-list) and reads the chosen `.js` file's text via
+`FileReader`. The text is stashed in `importedLibrarySource` and injected into
+the sketch iframe's `srcdoc` after the capture controller and before the
+sketch code (see `runSketch()`), so it runs in the same sandboxed,
+opaque-origin iframe as the sketch - no broader a capability than the sketch
+code the user already writes there. `samples/test-import-lib.js` is a minimal
+file for exercising the button (defines `window.neoTestLib.greet()`). This is
+currently a single-file, non-persistent import (cleared on reload); treat it
+as a starting point, not the final design, if it needs to support multiple
+libraries or persistence later.
 
 ## Build & run
 
@@ -198,12 +211,16 @@ cmake --build build --target neo-processing -j --config Debug
 by the CMake build itself (`icons/app.rc`, see above), so this script does not
 need a separate icon-injection step.
 
-### CI
+### Releases
 
 `.github/workflows/build.yml` builds Release distributables for Windows
-(MSVC) and Linux (GCC + GTK3/WebKit2GTK) on every push/PR to `main`, uploading
-each as a workflow artifact. There is no test suite to run in CI — it only
-verifies the project configures and builds cleanly on both platforms.
+(MSVC) and Linux (GCC + GTK3/WebKit2GTK) and publishes them to a GitHub
+Release - but **only when a `v*.*.*` tag is pushed**, or on manual dispatch.
+It intentionally does not run on regular pushes/PRs: day-to-day rounds stay
+branch -> PR -> merge with no CI gate. There is no test suite - the workflow
+only verifies the project configures and builds cleanly on both platforms as
+part of cutting a release. To cut one: bump `project(... VERSION x.y.z ...)`
+in `CMakeLists.txt`, then `git tag vx.y.z && git push --tags`.
 
 ### Dependencies (fetched at configure time into `build/_deps/`)
 
@@ -220,14 +237,14 @@ downloaded into the build tree.
 ## Conventions & gotchas
 
 - **`public/` is embedded at build time.** Editing a file under `public/`
-  requires a rebuild to take effect — there is no live reload. Adding a new file
+  requires a rebuild to take effect - there is no live reload. Adding a new file
   to `public/` makes it served automatically (it is part of the embedded FS).
 - **Boost.Asio is intentional but currently idle.** `main()` spins up an
   `io_context` on its own thread as the foundation for future async work. It does
   no work yet. Don't reintroduce console-spam heartbeats; post real tasks to
   `ioc` when async behaviour is actually needed.
 - **Loopback only.** The server binds `127.0.0.1`. Never change it to `0.0.0.0`
-  or a public interface — it is not designed to be reachable off-host.
+  or a public interface - it is not designed to be reachable off-host.
 - **Server-side limits.** Request bodies are capped at `kMaxScriptBytes` (5 MiB)
   and read/write timeouts are set. Error responses to the client are generic;
   detailed errors go to `std::cerr` (avoid leaking internals to the client).
@@ -240,7 +257,7 @@ downloaded into the build tree.
 - **No console window.** On Windows the target is built as a GUI app
   (`WIN32_EXECUTABLE`, with `/ENTRY:mainCRTStartup` so `int main()` stays the
   entry point), so launching the `.exe` opens no terminal. `std::cerr`/`std::cout`
-  logging therefore isn't visible from a console — attach a debugger if you need
+  logging therefore isn't visible from a console - attach a debugger if you need
   it during development.
 - **Platform.** Primary development is on Windows (PowerShell). The Bash tool is
   available for POSIX scripts.
