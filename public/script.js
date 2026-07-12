@@ -854,6 +854,16 @@ let audioMasterVolume = 1;
 const audioToggleButtons = document.querySelectorAll(".segmented-btn[data-audio]");
 const audioMasterSlider = document.getElementById("audio-master-slider");
 
+// Output device sketches should play to ("" = browser/OS default). Backed by
+// the Web Audio "Audio Output Devices" API (AudioContext.setSinkId() +
+// navigator.mediaDevices.enumerateDevices()) - lets a sketch's audio be
+// pointed at a specific device when the OS default isn't what's actually
+// being monitored (e.g. an HDMI or virtual device grabbed the default).
+let audioOutputId = "";
+const audioOutputSelect = document.getElementById("audio-output-select");
+const audioOutputRefresh = document.getElementById("audio-output-refresh");
+const audioOutputHint = document.getElementById("audio-output-hint");
+
 // Layers (see docs/proposals/layer-system.md, Phases 1-4 all done). Layers
 // 1..N are independent, simultaneously-running iframes composited in
 // .right-panel via z-index (array order = stack order, index 0 at the
@@ -1645,24 +1655,36 @@ const captureController = `
 })();
 `;
 
-// Master audio on/off + volume, injected ahead of the sketch code (see
-// docs/proposals/sound-section.md). Rather than hook every possible audio API
-// a sketch might use (p5.sound, raw Web Audio, an imported library), this
-// wraps AudioContext/webkitAudioContext once: each context gets a gain node
-// spliced between it and the real output, and `destination` is shadowed on
-// the instance to point at that gain node - so anything the sketch connects
-// to `ctx.destination` (p5.sound's master bus included) lands on our gain
-// node instead. No new capability crosses the sandbox: the postMessage
-// payload is just a boolean and a 0-1 float, iframe stays
-// sandbox="allow-scripts" with no allow-same-origin, exactly as elsewhere.
-function buildAudioController(initialEnabled, initialVolume) {
+// Master audio on/off + volume + output device, injected ahead of the
+// sketch code (see docs/proposals/sound-section.md). Rather than hook every
+// possible audio API a sketch might use (p5.sound, raw Web Audio, an
+// imported library), this wraps AudioContext/webkitAudioContext once: each
+// context gets a gain node spliced between it and the real output, and
+// `destination` is shadowed on the instance to point at that gain node - so
+// anything the sketch connects to `ctx.destination` (p5.sound's master bus
+// included) lands on our gain node instead. No new capability crosses the
+// sandbox: the postMessage payload is a boolean, a 0-1 float, and a device
+// id string (or ""), iframe stays sandbox="allow-scripts" with no
+// allow-same-origin, exactly as elsewhere. The device id itself is only ever
+// resolved in the parent (via navigator.mediaDevices.enumerateDevices()) and
+// handed down opaque - the sandboxed sketch never gets device enumeration
+// access of its own.
+function buildAudioController(initialEnabled, initialVolume, initialSinkId) {
   return `
 (function () {
   var masterGain = null;
+  var contexts = [];
   var enabled = ${initialEnabled ? "true" : "false"};
   var volume = ${JSON.stringify(typeof initialVolume === "number" ? initialVolume : 1)};
+  var sinkId = ${JSON.stringify(typeof initialSinkId === "string" ? initialSinkId : "")};
   function applyGain() {
     if (masterGain) masterGain.gain.value = enabled ? volume : 0;
+  }
+  function applySink(ctx) {
+    if (!sinkId || typeof ctx.setSinkId !== 'function') return;
+    ctx.setSinkId(sinkId).catch(function (err) {
+      parent.postMessage({ type: 'sketch-error', message: 'Audio output device unavailable: ' + err.message }, '*');
+    });
   }
   var RealAC = window.AudioContext || window.webkitAudioContext;
   if (RealAC) {
@@ -1672,6 +1694,8 @@ function buildAudioController(initialEnabled, initialVolume) {
       masterGain.connect(ctx.destination);
       applyGain();
       Object.defineProperty(ctx, 'destination', { get: function () { return masterGain; } });
+      contexts.push(ctx);
+      applySink(ctx);
       return ctx;
     };
     window.AudioContext = Patched;
@@ -1682,6 +1706,10 @@ function buildAudioController(initialEnabled, initialVolume) {
     if (data.type === 'audio-set') {
       if (typeof data.enabled === 'boolean') enabled = data.enabled;
       if (typeof data.volume === 'number') volume = data.volume;
+      if (typeof data.sinkId === 'string' && data.sinkId !== sinkId) {
+        sinkId = data.sinkId;
+        contexts.forEach(applySink);
+      }
       applyGain();
     }
   });
@@ -1797,7 +1825,7 @@ function runLayer(layer) {
       window.parent.postMessage({ type: 'sketch-error', message: msg + ' (line ' + line + ')' }, '*');
     };
     ${captureController}
-    ${buildAudioController(audioEnabled, audioMasterVolume)}
+    ${buildAudioController(audioEnabled, audioMasterVolume, audioOutputId)}
     ${layerController}
     ${importedLibrarySource}
     ${code}
@@ -2274,9 +2302,9 @@ anchorButtons.forEach((button) => {
   });
 });
 
-// Master audio on/off + volume: pushes live to every running layer so the
-// mute/volume change takes effect immediately, no need to re-run. Global
-// across all layers, not per-layer, for now.
+// Master audio on/off + volume + output device: pushes live to every
+// running layer so the change takes effect immediately, no need to re-run.
+// Global across all layers, not per-layer, for now.
 function applyAudioState() {
   if (audioMasterSlider) {
     audioMasterSlider.disabled = !audioEnabled;
@@ -2284,11 +2312,72 @@ function applyAudioState() {
   layers.forEach((layer) => {
     if (layer.iframe && layer.iframe.contentWindow) {
       layer.iframe.contentWindow.postMessage(
-        { type: "audio-set", enabled: audioEnabled, volume: audioMasterVolume },
+        { type: "audio-set", enabled: audioEnabled, volume: audioMasterVolume, sinkId: audioOutputId },
         "*"
       );
     }
   });
+}
+
+// Populates the Output device dropdown from navigator.mediaDevices - the
+// parent page isn't sandboxed, so this is the only place in the app that can
+// see real device ids/labels (see the block comment on buildAudioController).
+// Device labels (and, in some browsers, distinct device ids) stay blank
+// until a media permission has been granted at least once; requestPermission
+// triggers that one-time prompt via a throwaway getUserMedia() call.
+async function refreshAudioOutputs(requestPermission) {
+  if (!audioOutputSelect) {
+    return;
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+    if (audioOutputHint) {
+      audioOutputHint.textContent = "Output device selection isn't supported in this environment.";
+    }
+    return;
+  }
+
+  try {
+    let devices = await navigator.mediaDevices.enumerateDevices();
+    let outputs = devices.filter((d) => d.kind === "audiooutput");
+
+    if (requestPermission && outputs.some((d) => !d.label) && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+        devices = await navigator.mediaDevices.enumerateDevices();
+        outputs = devices.filter((d) => d.kind === "audiooutput");
+      } catch (permError) {
+        appendStatus(`Could not get audio device labels: ${permError.message}`);
+      }
+    }
+
+    const previousValue = audioOutputSelect.value;
+    audioOutputSelect.innerHTML = "";
+    const defaultOption = document.createElement("option");
+    defaultOption.value = "";
+    defaultOption.textContent = "System Default";
+    audioOutputSelect.appendChild(defaultOption);
+    outputs.forEach((device, index) => {
+      const option = document.createElement("option");
+      option.value = device.deviceId;
+      option.textContent = device.label || `Output device ${index + 1}`;
+      audioOutputSelect.appendChild(option);
+    });
+
+    const stillPresent = outputs.some((d) => d.deviceId === previousValue);
+    audioOutputSelect.value = stillPresent ? previousValue : "";
+    audioOutputId = audioOutputSelect.value;
+
+    if (audioOutputHint) {
+      audioOutputHint.textContent = outputs.length
+        ? ""
+        : "No output devices detected - click Detect Devices after allowing permission.";
+    }
+  } catch (error) {
+    if (audioOutputHint) {
+      audioOutputHint.textContent = `Could not list output devices: ${error.message}`;
+    }
+  }
 }
 
 audioToggleButtons.forEach((button) => {
@@ -2314,6 +2403,20 @@ if (audioMasterSlider) {
     applyAudioState();
   });
 }
+
+if (audioOutputSelect) {
+  audioOutputSelect.addEventListener("change", () => {
+    audioOutputId = audioOutputSelect.value;
+    applyAudioState();
+    appendStatus(`Sketch audio output set to ${audioOutputSelect.selectedOptions[0]?.textContent || "System Default"}`);
+  });
+}
+
+if (audioOutputRefresh) {
+  audioOutputRefresh.addEventListener("click", () => refreshAudioOutputs(true));
+}
+
+refreshAudioOutputs(false);
 
 const runButton = document.getElementById("run-button");
 if (runButton) {
