@@ -1653,21 +1653,31 @@ function buildAudioController(initialEnabled, initialVolume) {
 // layer's iframe to match instead of stretching it to fill .right-panel -
 // that's what lets differently-sized layers actually composite like
 // stacked artboards (see docs/proposals/layer-system.md's "Decisions").
-// Polls rather than using a MutationObserver/ResizeObserver on the canvas:
-// simpler, and cheap enough at a 4x/second cadence.
+// Detecting the canvas is two-speed: p5 creates it asynchronously (after
+// its own library load + setup()), so a fresh layer briefly has no canvas
+// at all - runLayer() bakes in a 400x400 default for that window. Polling
+// only every 250ms made that default visibly linger (a "jump" once the
+// real size arrived); rAF-polling every frame until the canvas first
+// appears catches it within a frame or two instead, then we drop to the
+// slower 250ms interval (cheap) to still catch later resizeCanvas() calls.
 const layerController = `
 (function () {
   var lastW = 0, lastH = 0;
   function reportCanvasSize() {
     var el = document.querySelector('canvas');
-    if (!el) return;
+    if (!el) return false;
     var w = Math.max(1, Math.round(el.clientWidth || el.width));
     var h = Math.max(1, Math.round(el.clientHeight || el.height));
     if (w !== lastW || h !== lastH) {
       lastW = w; lastH = h;
       parent.postMessage({ type: 'canvas-size', width: w, height: h }, '*');
     }
+    return true;
   }
+  (function fastPollUntilFound() {
+    if (reportCanvasSize()) return;
+    requestAnimationFrame(fastPollUntilFound);
+  })();
   setInterval(reportCanvasSize, 250);
   window.addEventListener('message', function (event) {
     var data = event.data || {};
