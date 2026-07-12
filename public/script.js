@@ -141,6 +141,16 @@ let activeLibrary = {
 let importedLibrarySource = "";
 let importedLibraryName = "";
 
+// p5.sound (the p5.js sound addon: p5.SoundFile, p5.Oscillator, p5.Amplitude,
+// getAudioContext(), etc.) isn't loaded by default - the Sound panel's
+// examples use raw Web Audio directly instead. Off by default so existing
+// sketches aren't affected; the Libraries panel's checkbox toggles it,
+// injecting a second <script> tag right after the core p5.js build (see
+// runLayer()). Bundled locally at the exact addon version that shipped with
+// p5.js 1.11.3, so it stays correct even when the core library is swapped
+// back to the bundled default.
+let includeP5Sound = false;
+
 const defaultSketch = `// Start your sketch
 function setup() {
   createCanvas(400, 400);
@@ -835,6 +845,7 @@ const libraryApplyButton = document.getElementById("library-apply");
 const importLibraryButton = document.getElementById("import-library-button");
 const importLibraryInput = document.getElementById("import-library-input");
 const importLibraryHint = document.getElementById("import-library-hint");
+const includeSoundCheckbox = document.getElementById("library-include-sound");
 const sketchBgColor = document.getElementById("sketch-bg-color");
 
 // Background colour shown behind the sketch canvas (default white). Baked into
@@ -863,6 +874,19 @@ let audioOutputId = "";
 const audioOutputSelect = document.getElementById("audio-output-select");
 const audioOutputRefresh = document.getElementById("audio-output-refresh");
 const audioOutputHint = document.getElementById("audio-output-hint");
+const audioLevelFill = document.getElementById("audio-level-fill");
+
+// Live 0-1 meter of the loudest running layer's actual audio output (see the
+// "audio-level" case in the message listener and buildAudioController's
+// analyser) - shows whether a sketch is producing sound at all, independent
+// of whether it's audible (wrong output device, system mute, etc.).
+function updateAudioLevelMeter() {
+  if (!audioLevelFill) {
+    return;
+  }
+  const level = layers.reduce((max, l) => Math.max(max, l.audioLevel || 0), 0);
+  audioLevelFill.style.width = `${Math.round(Math.min(1, level) * 100)}%`;
+}
 
 // Layers (see docs/proposals/layer-system.md, Phases 1-4 all done). Layers
 // 1..N are independent, simultaneously-running iframes composited in
@@ -1704,6 +1728,8 @@ function buildAudioController(initialEnabled, initialVolume, initialSinkId) {
 (function () {
   var masterGain = null;
   var contexts = [];
+  var analyser = null;
+  var levelBuffer = null;
   var enabled = ${initialEnabled ? "true" : "false"};
   var volume = ${JSON.stringify(typeof initialVolume === "number" ? initialVolume : 1)};
   var sinkId = ${JSON.stringify(typeof initialSinkId === "string" ? initialSinkId : "")};
@@ -1726,6 +1752,13 @@ function buildAudioController(initialEnabled, initialVolume, initialSinkId) {
       Object.defineProperty(ctx, 'destination', { get: function () { return masterGain; } });
       contexts.push(ctx);
       applySink(ctx);
+      // Tapped post-gain (after mute/volume are applied), so the meter
+      // reflects what's actually reaching the output, not the sketch's raw
+      // signal - a muted sketch reads as a flat 0 even if it's synthesizing.
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      masterGain.connect(analyser);
+      levelBuffer = new Uint8Array(analyser.fftSize);
       return ctx;
     };
     window.AudioContext = Patched;
@@ -1743,6 +1776,28 @@ function buildAudioController(initialEnabled, initialVolume, initialSinkId) {
       applyGain();
     }
   });
+  // Reports the current RMS level (0-1) of the master bus at ~20fps -
+  // throttled independently of the sketch's own frame rate so it keeps
+  // updating even if the sketch's draw() is slow or paused.
+  var lastLevelReport = 0;
+  function reportLevel(now) {
+    if (!lastLevelReport || now - lastLevelReport >= 50) {
+      lastLevelReport = now;
+      var level = 0;
+      if (analyser) {
+        analyser.getByteTimeDomainData(levelBuffer);
+        var sumSquares = 0;
+        for (var i = 0; i < levelBuffer.length; i++) {
+          var v = (levelBuffer[i] - 128) / 128;
+          sumSquares += v * v;
+        }
+        level = Math.min(1, Math.sqrt(sumSquares / levelBuffer.length));
+      }
+      parent.postMessage({ type: 'audio-level', level: level }, '*');
+    }
+    requestAnimationFrame(reportLevel);
+  }
+  requestAnimationFrame(reportLevel);
 })();
 `;
 }
@@ -1848,6 +1903,7 @@ function runLayer(layer) {
     }
   </style>
   <script src="${activeLibrary.url}"><\/script>
+  ${includeP5Sound ? `<script src="/libs/p5.sound.min.js"><\/script>` : ""}
 </head>
 <body>
   <script>
@@ -1893,6 +1949,8 @@ function stopLayer(layer) {
 
   layer.iframe.remove();
   layer.iframe = null;
+  layer.audioLevel = 0;
+  updateAudioLevelMeter();
   if (layer.id === activeLayerId) {
     resetRecordingState();
   }
@@ -2275,6 +2333,14 @@ window.addEventListener("message", (event) => {
       }
       break;
     }
+    case "audio-level": {
+      const layer = layers.find((l) => l.iframe && l.iframe.contentWindow === event.source);
+      if (layer) {
+        layer.audioLevel = typeof data.level === "number" ? data.level : 0;
+      }
+      updateAudioLevelMeter();
+      break;
+    }
     default:
       break;
   }
@@ -2303,6 +2369,14 @@ if (libraryApplyButton) {
 if (importLibraryButton && importLibraryInput) {
   importLibraryButton.addEventListener("click", () => importLibraryInput.click());
   importLibraryInput.addEventListener("change", importLibraryFile);
+}
+
+if (includeSoundCheckbox) {
+  includeSoundCheckbox.addEventListener("change", () => {
+    includeP5Sound = includeSoundCheckbox.checked;
+    appendStatus(`p5.sound ${includeP5Sound ? "included" : "removed"} - re-run to pick up the change`);
+    rerunAllRunningLayers();
+  });
 }
 
 // Applies the chosen background colour - this *is* layer 0 (see

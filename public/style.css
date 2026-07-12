@@ -271,6 +271,41 @@ body {
   border-radius: var(--radius-sm);
 }
 
+/* Live 0-1 meter of the sketch's actual audio output (tapped post-gain, see
+   buildAudioController's analyser) - lets you see whether a sketch is
+   producing sound at all, independent of whether you can hear it. */
+.audio-level-meter {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.audio-level-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width 60ms linear;
+}
+
+.panel-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 11px;
+  font-size: 0.875rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.panel-checkbox-row input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .panel-hint {
   margin-top: 11px;
   font-size: 0.78rem;
