@@ -586,9 +586,10 @@ body {
   border-color: var(--border-strong);
 }
 
-/* Run / Stop — primary transport controls, neutral grey. */
+/* Run / Stop / Refresh — primary transport controls, neutral grey. */
 .run-button,
-.stop-button {
+.stop-button,
+.refresh-button {
   background: var(--transport-bg);
   color: var(--text);
   border-color: var(--border-strong);
@@ -599,7 +600,8 @@ body {
 }
 
 .run-button:hover,
-.stop-button:hover {
+.stop-button:hover,
+.refresh-button:hover {
   background: var(--transport-bg-hover);
   border-color: var(--muted);
 }
