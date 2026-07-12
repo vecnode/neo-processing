@@ -7,13 +7,13 @@
 > A native desktop editor and live runtime for [p5.js](https://p5js.org/)
 > sketches - a modern, JavaScript-based alternative to the Java Processing IDE.
 
-![neo-processing editor in dark mode, running the Fireworks Burst example, with the Sound panel open](./assets/dark-mode.png)
+![neo-processing editor in dark mode, running the Fireworks Burst example across three layers, with the Sound panel's audio level meter and output device selector open](./assets/dark-mode-sound-panel.png)
 
 neo-processing ships as a **single self-contained executable**. It embeds a code
 editor and a live preview into a native desktop window, so you can write a p5.js
 sketch with the goal of real-world, full-screen deployment.
 
-> **Status:** v0.1.0 - active development. Interfaces and features may change.
+> **Status:** v0.1.1 - active development. Interfaces and features may change.
 
 ## Features
 
@@ -43,10 +43,14 @@ sketch with the goal of real-world, full-screen deployment.
 - **Import JS Library** - load a local `.js` file (Libraries panel) into the
   sketch iframe alongside p5.js, for libraries outside the built-in manifest.
 - **Sound panel** - master on/off + a 0-1 volume slider over sketch audio
-  output (muted by default). See
+  output (muted by default), a live 0-1 level meter showing the actual
+  post-gain output, and an output device selector (backed by
+  `AudioContext.setSinkId()`) for pointing sketch audio at a specific
+  playback device. See
   [docs/proposals/sound-section.md](./docs/proposals/sound-section.md) for the
   design (a wrapped `AudioContext.destination`, so it works with p5.sound,
-  raw Web Audio, or an imported library).
+  raw Web Audio, or an imported library). p5.sound itself is opt-in via the
+  Libraries panel's "Include p5.sound" checkbox.
 - **Light/dark theme** - toggle in the top bar; persists across restarts.
 
 ### Roadmap
@@ -147,7 +151,7 @@ not committed to the repository:
 | [cpp-embedlib](https://github.com/yhirose/cpp-embedlib) | Embeds `public/` into the executable. |
 | Boost (`asio`, `system`) | Async infrastructure thread. |
 
-The frontend libraries in `public/libs/` (Ace, p5.js) are vendored and committed.
+The frontend libraries in `public/libs/` (Ace, p5.js, p5.sound) are vendored and committed.
 
 ## Project layout
 
