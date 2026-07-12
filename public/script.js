@@ -1862,6 +1862,28 @@ function stopAllLayers() {
   appendStatus("All layers stopped");
 }
 
+// Refresh: tears down every layer (stopping any running iframes) and
+// rebuilds the app back to its startup state - a single default layer
+// running the default sketch, same as a fresh launch.
+function refreshApp() {
+  layers.forEach((layer) => {
+    if (layer.iframe) {
+      layer.iframe.remove();
+      layer.iframe = null;
+    }
+  });
+  layers = [];
+  activeLayerId = null;
+  nextLayerNumber = 1;
+  resetRecordingState();
+
+  const layer = addLayer(defaultSketch);
+  if (layer) {
+    activateLayer(layer.id);
+  }
+  appendStatus("Refreshed - all layers reset to startup state");
+}
+
 async function saveMedia(buffer, ext) {
   const response = await fetch(`/api/save-media?ext=${encodeURIComponent(ext)}`, {
     method: "POST",
@@ -2311,6 +2333,14 @@ if (stopButton) {
 
 if (stopAllLayersButton) {
   stopAllLayersButton.addEventListener("click", stopAllLayers);
+}
+
+const refreshButton = document.getElementById("refresh-button");
+if (refreshButton) {
+  refreshButton.addEventListener("click", (event) => {
+    refreshApp();
+    event.stopPropagation();
+  });
 }
 
 if (hamburgerButton) {
