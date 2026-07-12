@@ -397,7 +397,7 @@ int main() {
   std::thread server_thread([&]() { server.listen_after_bind(); });
 
   webview::webview w(false, nullptr);
-  w.set_title("neo-processing v0.1.0");
+  w.set_title("neo-processing v0.1.1");
   w.set_size(1280, 720, WEBVIEW_HINT_NONE);
 
   // Exposed to the frontend as window.neoSetDesktopFullscreen(bool): toggles the
