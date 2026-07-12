@@ -985,6 +985,24 @@ body::-webkit-scrollbar-thumb:hover {
   min-width: 40px;
 }
 
+.layer-row-pos {
+  flex: 0 0 auto;
+  width: 40px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 1px 3px;
+  font-size: 0.68rem;
+  font-family: ui-monospace, "Cascadia Code", "SF Mono", "Courier New", monospace;
+  color: var(--text);
+  background: var(--panel);
+}
+
+.layer-row-pos:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
 .layer-row-opacity {
   flex: 0 0 auto;
   width: 46px;

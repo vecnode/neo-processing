@@ -90,8 +90,14 @@ below). The default, bundled build keeps the app fully offline.
     (`layerController`, injected like `captureController`), so a hidden
     layer stops costing CPU, not just being invisible. Each layer row also
     has a 0-1 opacity slider (`setLayerOpacity()`, plain CSS `opacity` on
-    the iframe - visible live, not just in captures). Sound stays a global
-    broadcast to every running layer, not per-layer (see the proposal doc's
+    the iframe - visible live, not just in captures) and X/Y position
+    fields (`setLayerOffset()`, `layer.offsetX`/`offsetY` in px) that drift
+    the layer from the Sketch panel's anchor (Center/Top Left - still
+    global) rather than replacing it: `positionLayerIframe()` adds the
+    offset on top of whichever base position the anchor computes, so
+    layers sharing one anchor can still land in different spots. Sound
+    stays a global broadcast to every running layer, not per-layer (see the
+    proposal doc's
     "Decisions"). **Capture PNG and Record composite every visible layer**
     (`buildCompositeCanvas()`, requesting a snapshot from each layer's
     `captureController` via a `capture-frame`/`capture-frame-result`
