@@ -55,6 +55,13 @@
             <span class="sketch-bg-label">Master</span>
             <input type="range" id="audio-master-slider" min="0" max="1" step="0.01" value="1" aria-label="Master volume">
           </div>
+          <div class="panel-controls">
+            <select id="audio-output-select" class="panel-select" aria-label="Audio output device">
+              <option value="">System Default</option>
+            </select>
+            <button id="audio-output-refresh" class="panel-button" type="button">Detect Devices</button>
+          </div>
+          <p class="panel-hint" id="audio-output-hint"></p>
         </section>
 
         <hr class="panel-separator">
