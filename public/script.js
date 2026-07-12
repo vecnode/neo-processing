@@ -854,14 +854,13 @@ let audioMasterVolume = 1;
 const audioToggleButtons = document.querySelectorAll(".segmented-btn[data-audio]");
 const audioMasterSlider = document.getElementById("audio-master-slider");
 
-// Layers (see docs/proposals/layer-system.md). Phase 1 (tabs, one
-// ace.EditSession per layer) + Phase 2 (stacking): layers 1..N are
-// independent, simultaneously-running iframes composited in .right-panel
-// via z-index (array order = stack order, index 0 at the bottom). Layer 0
-// isn't in this array at all - it's just the panel's own CSS background
-// (sketchBg/--sketch-bg), no code runs on it. Capture/Record are still
-// scoped to the active layer only (Phase 3 - compositing the capture/
-// recording pipeline itself - isn't built yet).
+// Layers (see docs/proposals/layer-system.md, Phases 1-4 all done). Layers
+// 1..N are independent, simultaneously-running iframes composited in
+// .right-panel via z-index (array order = stack order, index 0 at the
+// bottom). Layer 0 isn't in this array at all - it's just the panel's own
+// CSS background (sketchBg/--sketch-bg), no code runs on it. Capture PNG
+// and Record composite every visible layer (buildCompositeCanvas()), not
+// just the active one.
 const MAX_LAYERS = 5;
 const tabStrip = document.getElementById("tab-strip");
 const layersPanel = document.getElementById("layers-panel");
@@ -901,6 +900,12 @@ function addLayer(code) {
     canvasWidth: 400,
     canvasHeight: 400,
     opacity: 1,
+    // Per-layer drift from the anchor's base position (Sketch panel's
+    // Center/Top Left - still global, see docs/proposals/layer-system.md's
+    // "Decisions"), in px. Lets layers that share the same anchor still
+    // land in different spots (see positionLayerIframe()).
+    offsetX: 0,
+    offsetY: 0,
   };
   nextLayerNumber += 1;
   layers.push(layer);
@@ -950,26 +955,28 @@ function positionLayerIframe(layer) {
 
   const w = layer.canvasWidth || 400;
   const h = layer.canvasHeight || 400;
+  const offsetX = layer.offsetX || 0;
+  const offsetY = layer.offsetY || 0;
   layer.iframe.style.width = `${w}px`;
   layer.iframe.style.height = `${h}px`;
 
   if (sketchAnchor === "center") {
-    // Deliberately not using .right-panel.getBoundingClientRect() here: the
-    // app runs at html { zoom: 0.8 } (see style.css), and getBoundingClientRect()
-    // reports post-zoom (visual) pixels while inline style px values like
-    // `w`/`h` above are pre-zoom (logical) - mixing the two threw centering
-    // off by exactly the zoom factor (confirmed: setting width:200px
-    // rendered as an actual 160px box). The classic 50% + negative-margin
-    // centering trick sidesteps this entirely, since both the percentage
-    // and the margin resolve within the iframe's own local coordinate
-    // system - no cross-context pixel math, so it's correct at any zoom.
+    // Deliberately not using .right-panel.getBoundingClientRect() here:
+    // getBoundingClientRect() and inline style px values can land in
+    // different coordinate systems depending on ambient page scaling (this
+    // bit the app once already, back when html had zoom: 0.8 - see git
+    // history). The classic 50% + negative-margin centering trick sidesteps
+    // that entirely, since both the percentage and the margin resolve
+    // within the iframe's own local coordinate system - no cross-context
+    // pixel math needed. The per-layer offsetX/offsetY drift (see the X/Y
+    // fields in the Layers panel) is just added on top of that margin.
     layer.iframe.style.left = "50%";
     layer.iframe.style.top = "50%";
-    layer.iframe.style.marginLeft = `${-w / 2}px`;
-    layer.iframe.style.marginTop = `${-h / 2}px`;
+    layer.iframe.style.marginLeft = `${-w / 2 + offsetX}px`;
+    layer.iframe.style.marginTop = `${-h / 2 + offsetY}px`;
   } else {
-    layer.iframe.style.left = "0px";
-    layer.iframe.style.top = "0px";
+    layer.iframe.style.left = `${offsetX}px`;
+    layer.iframe.style.top = `${offsetY}px`;
     layer.iframe.style.marginLeft = "0px";
     layer.iframe.style.marginTop = "0px";
   }
@@ -1056,6 +1063,22 @@ function setLayerOpacity(layer, opacity) {
   if (layer.iframe) {
     layer.iframe.style.opacity = String(opacity);
   }
+}
+
+// Per-layer X/Y drift from the anchor's base position (see the X_POS/Y_POS
+// fields in the Layers panel and positionLayerIframe()). Stored even when
+// the layer isn't running, so a later Run respects it.
+function setLayerOffset(layer, axis, value) {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) {
+    return;
+  }
+  if (axis === "x") {
+    layer.offsetX = n;
+  } else {
+    layer.offsetY = n;
+  }
+  positionLayerIframe(layer);
 }
 
 function renderTabStrip() {
@@ -1159,6 +1182,24 @@ function renderLayersPanel() {
     name.title = layer.name;
     name.addEventListener("click", () => activateLayer(layer.id));
 
+    const posX = document.createElement("input");
+    posX.type = "number";
+    posX.className = "layer-row-pos";
+    posX.step = "1";
+    posX.value = String(layer.offsetX || 0);
+    posX.title = "X offset from anchor (px)";
+    posX.setAttribute("aria-label", `${layer.name} X position`);
+    posX.addEventListener("input", (event) => setLayerOffset(layer, "x", event.target.value));
+
+    const posY = document.createElement("input");
+    posY.type = "number";
+    posY.className = "layer-row-pos";
+    posY.step = "1";
+    posY.value = String(layer.offsetY || 0);
+    posY.title = "Y offset from anchor (px)";
+    posY.setAttribute("aria-label", `${layer.name} Y position`);
+    posY.addEventListener("input", (event) => setLayerOffset(layer, "y", event.target.value));
+
     const status = document.createElement("span");
     status.className = "layer-row-status";
     status.textContent = !layer.iframe ? "Stopped" : layer.visible ? "Running" : "Hidden";
@@ -1206,6 +1247,8 @@ function renderLayersPanel() {
     stopRowButton.addEventListener("click", () => stopLayer(layer));
 
     row.appendChild(name);
+    row.appendChild(posX);
+    row.appendChild(posY);
     row.appendChild(status);
     row.appendChild(opacitySlider);
     row.appendChild(upButton);
