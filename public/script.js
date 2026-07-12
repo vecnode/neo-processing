@@ -1604,6 +1604,36 @@ if (rightPanelForResize && typeof ResizeObserver !== "undefined") {
 
 
 
+// Forwards the sketch iframe's console.* calls and unhandled promise
+// rejections to the parent's status terminal - the sandboxed iframe has no
+// devtools the user can easily reach, so without this, console.log/warn/error
+// (and async errors p5.js reports via a rejected Promise rather than a thrown
+// exception, which window.onerror below doesn't catch) are invisible.
+const consoleForwardController = `
+(function () {
+  ['log', 'info', 'warn', 'error', 'debug'].forEach(function (level) {
+    var original = console[level] ? console[level].bind(console) : function () {};
+    console[level] = function () {
+      var args = Array.prototype.slice.call(arguments);
+      var message = args.map(function (arg) {
+        if (arg instanceof Error) return arg.message;
+        if (typeof arg === 'object' && arg !== null) {
+          try { return JSON.stringify(arg); } catch (e) { return String(arg); }
+        }
+        return String(arg);
+      }).join(' ');
+      parent.postMessage({ type: 'sketch-console', level: level, message: message }, '*');
+      original.apply(console, args);
+    };
+  });
+  window.addEventListener('unhandledrejection', function (event) {
+    var reason = event.reason;
+    var message = reason && reason.message ? reason.message : String(reason);
+    parent.postMessage({ type: 'sketch-error', message: 'Unhandled rejection: ' + message }, '*');
+  });
+})();
+`;
+
 // Capture/record controller injected into every sketch iframe. Because the
 // iframe is sandboxed to an opaque origin, the parent cannot touch its canvas
 // directly — instead we record/snapshot here (using the GPU-backed
@@ -1824,6 +1854,7 @@ function runLayer(layer) {
     window.onerror = function(msg, src, line) {
       window.parent.postMessage({ type: 'sketch-error', message: msg + ' (line ' + line + ')' }, '*');
     };
+    ${consoleForwardController}
     ${captureController}
     ${buildAudioController(audioEnabled, audioMasterVolume, audioOutputId)}
     ${layerController}
@@ -2223,6 +2254,16 @@ window.addEventListener("message", (event) => {
     case "sketch-error":
       appendStatus(`Sketch error: ${data.message}`);
       break;
+    case "sketch-console": {
+      const prefix =
+        data.level === "error"
+          ? "[BROWSER CONSOLE ERROR]"
+          : data.level === "warn"
+            ? "[BROWSER CONSOLE WARN]"
+            : "[BROWSER CONSOLE]";
+      appendStatus(`${prefix} ${data.message}`);
+      break;
+    }
     case "canvas-size": {
       // Identify which layer sent this by matching event.source (its
       // iframe's contentWindow) - multiple layers share this one listener.
